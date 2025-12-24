@@ -14,7 +14,6 @@ module.exports = async function handler(req, res) {
   const user = getUser(req);
   const { tournamentId } = req.query;
 
-  // GET: Sorted by custom order, then time
   if (req.method === "GET") {
     if (!tournamentId) return res.json([]);
     const { data, error } = await supabase
@@ -27,11 +26,9 @@ module.exports = async function handler(req, res) {
     return res.json(data);
   }
 
-  // ADMIN ONLY
   if (!user || !user.isAdmin)
     return res.status(403).json({ error: "Admin only" });
 
-  // POST: Create Match
   if (req.method === "POST") {
     const {
       teamAId,
@@ -44,7 +41,6 @@ module.exports = async function handler(req, res) {
     if (!teamAId || !teamBId)
       return res.status(400).json({ error: "Select teams" });
 
-    // Fetch names
     const { data: teams } = await supabase
       .from("teams")
       .select("id, name")
@@ -52,7 +48,6 @@ module.exports = async function handler(req, res) {
     const teamA = teams.find((t) => t.id === teamAId);
     const teamB = teams.find((t) => t.id === teamBId);
 
-    // Get max order
     const { data: max } = await supabase
       .from("matches")
       .select("match_order")
@@ -72,7 +67,7 @@ module.exports = async function handler(req, res) {
         team_b_name: teamB.name,
         start_time: startTime,
         match_order: newOrder,
-        match_type: matchType || "normal", // Save match type
+        match_type: matchType || "normal",
       })
       .select()
       .single();
@@ -81,13 +76,35 @@ module.exports = async function handler(req, res) {
     return res.json(data);
   }
 
-  // PUT: Update Score OR Reorder
+  // PUT: Update Score, Order, OR TEAMS (For Finals Update)
   if (req.method === "PUT") {
-    const { matchId, scoreA, scoreB, newOrder } = req.body;
+    const { matchId, scoreA, scoreB, newOrder, teamAId, teamBId } = req.body;
 
     let updateData = {};
-    if (newOrder !== undefined) updateData = { match_order: newOrder };
-    else updateData = { score_a: scoreA, score_b: scoreB, status: "finished" };
+
+    // Scenario 1: Update Teams (Auto-Finals update)
+    if (teamAId && teamBId) {
+      const { data: teams } = await supabase
+        .from("teams")
+        .select("id, name")
+        .in("id", [teamAId, teamBId]);
+      const tA = teams.find((t) => t.id === teamAId);
+      const tB = teams.find((t) => t.id === teamBId);
+      updateData = {
+        team_a_id: teamAId,
+        team_b_id: teamBId,
+        team_a_name: tA.name,
+        team_b_name: tB.name,
+      };
+    }
+    // Scenario 2: Reorder
+    else if (newOrder !== undefined) {
+      updateData = { match_order: newOrder };
+    }
+    // Scenario 3: Score Update
+    else {
+      updateData = { score_a: scoreA, score_b: scoreB, status: "finished" };
+    }
 
     const { data, error } = await supabase
       .from("matches")
@@ -99,7 +116,6 @@ module.exports = async function handler(req, res) {
     return res.json(data);
   }
 
-  // DELETE: Remove Match
   if (req.method === "DELETE") {
     const { id } = req.body;
     const { error } = await supabase.from("matches").delete().eq("id", id);

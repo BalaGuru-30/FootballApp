@@ -81,6 +81,11 @@
         background: var(--danger);
         color: white;
       }
+      .btn-gold {
+        background: var(--gold);
+        color: black;
+      } /* NEW GOLD BTN */
+
       .btn-icon {
         background: transparent;
         color: var(--text-dim);
@@ -176,14 +181,17 @@
         gap: 8px;
         width: 40%;
       }
+
+      /* FIXED: WIDER BADGE FOR 10-0 SCORES */
       .score-badge {
         background: var(--bg);
-        padding: 6px 12px;
+        padding: 6px 4px;
         border-radius: 8px;
         font-weight: bold;
         font-size: 16px;
-        min-width: 40px;
+        min-width: 60px;
         text-align: center;
+        white-space: nowrap;
       }
       .bg-green {
         background-color: #22c55e !important;
@@ -191,7 +199,7 @@
         border: 1px solid #16a34a;
       }
 
-      /* ARROW CONTROLS */
+      /* ARROWS */
       .reorder-controls {
         display: flex;
         flex-direction: column;
@@ -516,6 +524,14 @@
                 🗑
               </button>
             </div>
+
+            <button
+              class="btn btn-gold"
+              style="margin-bottom: 15px"
+              onclick="autoUpdateFinals()"
+            >
+              🏆 Set Finals (Top 2)
+            </button>
 
             <details id="addMatchDetails">
               <summary>+ Add Single Match</summary>
