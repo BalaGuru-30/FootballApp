@@ -8,7 +8,6 @@ let currentTeams = [];
 let currentMatches = [];
 let activeTab = "standings";
 let currentFilterTeamId = "all";
-let sortableInstance = null;
 
 function init() {
   if (token) {
@@ -29,16 +28,16 @@ function init() {
   }
   loadTournaments();
 
-  // REAL-TIME AUTO REFRESH
+  // Real-time polling
   setInterval(() => {
-    if (!document.hidden && !sortableInstance?.option("disabled")) {
+    if (!document.hidden) {
       // Refresh Tournament Details
       if (activeTournamentId) {
         if (activeTab === "fixtures") loadMatches(true);
         if (activeTab === "teams") loadTeams(true);
         if (activeTab === "standings") loadMatches(true);
       }
-      // NEW: Refresh Global Players for everyone
+      // Refresh Global Players
       if (
         document
           .getElementById("section-players")
@@ -48,47 +47,6 @@ function init() {
       }
     }
   }, 3000);
-}
-
-// --- SORTABLE JS INIT ---
-function initSortable() {
-  const el = document.getElementById("matches-list");
-  if (sortableInstance) sortableInstance.destroy();
-
-  if (isAdmin && currentFilterTeamId === "all") {
-    sortableInstance = new Sortable(el, {
-      handle: ".drag-handle",
-      animation: 150,
-      filter: ".final-match",
-      onEnd: async function (evt) {
-        const item = evt.item;
-        const prevItem = item.previousElementSibling;
-        const nextItem = item.nextElementSibling;
-
-        const prevOrder = prevItem ? parseFloat(prevItem.dataset.order) : 0;
-        const nextOrder = nextItem
-          ? parseFloat(nextItem.dataset.order)
-          : prevOrder + 2;
-
-        const newOrder = (prevOrder + nextOrder) / 2;
-        const matchId = item.dataset.id;
-
-        item.dataset.order = newOrder;
-
-        // Fix visuals immediately by reloading (prevents "Two Match 1s")
-        setTimeout(() => loadMatches(true), 50);
-
-        await fetch(`${API}/matches`, {
-          method: "PUT",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ matchId: matchId, newOrder: newOrder }),
-        });
-      },
-    });
-  }
 }
 
 // --- UI HELPERS ---
@@ -249,7 +207,6 @@ async function loadAllPlayers() {
   const players = await res.json();
   const list = document.getElementById("all-players-list");
 
-  // Simple check to avoid redrawing if list hasn't changed (prevents flicker)
   if (
     list.childElementCount === players.length &&
     document.activeElement.tagName !== "INPUT"
@@ -313,7 +270,6 @@ function closeTournament() {
   activeTournamentId = null;
   document.getElementById("view-dashboard").classList.remove("hidden");
   document.getElementById("view-tournament").classList.add("hidden");
-  if (sortableInstance) sortableInstance.destroy();
 }
 
 function switchTab(tab, el) {
@@ -362,7 +318,7 @@ async function loadTeams(silent = false) {
 function renderTeamList(container) {
   container.innerHTML = "";
   currentTeams.forEach((t) => {
-    // Generate Roster with Remove Button
+    // Generate Roster with Correct Name Confirmation
     const rosterHtml = t.team_players
       .map(
         (tp) => `
@@ -370,7 +326,12 @@ function renderTeamList(container) {
           ${tp.players.name} 
           ${
             isAdmin
-              ? `<span class="roster-rm" onclick="removePlayerFromTeam('${t.id}', '${tp.player_id}')">×</span>`
+              ? `<span class="roster-rm" onclick="removePlayerFromTeam('${
+                  t.id
+                }', '${tp.player_id}', '${tp.players.name.replace(
+                  /'/g,
+                  "\\'"
+                )}')">×</span>`
               : ""
           }
         </span>
@@ -503,9 +464,8 @@ async function linkPlayer(teamId, playerId) {
   showToast("Player Added");
   loadTeams();
 }
-// NEW: Remove Player
-async function removePlayerFromTeam(teamId, playerId) {
-  if (!confirm("Remove player from this team?")) return;
+async function removePlayerFromTeam(teamId, playerId, playerName) {
+  if (!confirm(`Remove ${playerName} from team?`)) return;
   await fetch(`${API}/teams`, {
     method: "PUT",
     headers: {
@@ -521,8 +481,6 @@ async function removePlayerFromTeam(teamId, playerId) {
 function applyFixtureFilter() {
   currentFilterTeamId = document.getElementById("fixtureFilter").value;
   renderMatchList(document.getElementById("matches-list"));
-  if (sortableInstance)
-    sortableInstance.option("disabled", currentFilterTeamId !== "all");
 }
 
 async function generateFixtures() {
@@ -580,7 +538,6 @@ async function loadMatches(silent = false) {
   const res = await fetch(`${API}/matches?tournamentId=${activeTournamentId}`);
   currentMatches = await res.json();
 
-  // SORT
   currentMatches.sort((a, b) => {
     if (a.match_type === "final" && b.match_type !== "final") return -1;
     if (a.match_type !== "final" && b.match_type === "final") return 1;
@@ -588,15 +545,11 @@ async function loadMatches(silent = false) {
   });
 
   if (!silent) renderMatchList(document.getElementById("matches-list"));
-  else if (
-    document.activeElement.tagName !== "INPUT" &&
-    !sortableInstance?.option("disabled")
-  )
+  else if (document.activeElement.tagName !== "INPUT")
     renderMatchList(document.getElementById("matches-list"));
 
   if (isAdmin)
     document.getElementById("matchDate").value = activeTournamentDate;
-  if (!silent) initSortable();
 }
 
 function renderMatchList(container) {
@@ -610,10 +563,9 @@ function renderMatchList(container) {
     document.getElementById("btnGen").style.opacity = "1";
   }
 
-  // FIX: Separate counter for display labels so they are always 1, 2, 3...
   let matchCounter = 0;
 
-  currentMatches.forEach((m) => {
+  currentMatches.forEach((m, index) => {
     if (currentFilterTeamId !== "all") {
       if (
         m.team_a_id !== currentFilterTeamId &&
@@ -623,7 +575,7 @@ function renderMatchList(container) {
     }
 
     const isFinal = m.match_type === "final";
-    if (!isFinal) matchCounter++; // Only increment for normal matches
+    if (!isFinal) matchCounter++;
 
     const tA = currentTeams.find((t) => t.id === m.team_a_id);
     const tB = currentTeams.find((t) => t.id === m.team_b_id);
@@ -632,21 +584,30 @@ function renderMatchList(container) {
     const score =
       m.status === "finished" ? `${m.score_a} - ${m.score_b}` : "VS";
     const scoreClass = m.status === "finished" ? "bg-green" : "";
-    const matchLabel = isFinal ? "🏆 GRAND FINAL" : `Match ${matchCounter}`; // Use counter, not DB order
+    const matchLabel = isFinal ? "🏆 GRAND FINAL" : `Match ${matchCounter}`;
 
     let delBtn = isAdmin
       ? `<span style="color:var(--danger); cursor:pointer;" class="delete-btn" onclick="deleteMatch(event, '${m.id}')">🗑</span>`
       : "";
-    let dragHandle =
-      isAdmin && !isFinal ? `<div class="drag-handle"></div>` : "";
+
+    // RE-IMPLEMENT ARROWS FOR REORDERING
+    let reorderUI =
+      isAdmin && !isFinal
+        ? `
+       <div class="reorder-controls">
+         <div class="reorder-btn" onclick="moveMatch(event, ${index}, -1)">▲</div>
+         <div class="reorder-btn" onclick="moveMatch(event, ${index}, 1)">▼</div>
+       </div>`
+        : "";
 
     const div = document.createElement("div");
     div.className = `match-card ${isFinal ? "final-match" : ""}`;
-    div.dataset.id = m.id;
-    div.dataset.order = m.match_order;
-
     div.onclick = (e) => {
-      if (!e.target.closest(".delete-btn")) openMatchModal(m, tA, tB);
+      if (
+        !e.target.closest(".reorder-controls") &&
+        !e.target.closest(".delete-btn")
+      )
+        openMatchModal(m, tA, tB);
     };
 
     div.innerHTML = `
@@ -658,11 +619,53 @@ function renderMatchList(container) {
            <div class="team-info" style="justify-content:flex-end;"><span style="font-weight:600; font-size:13px; text-align:right;">${m.team_b_name}</span><div style="width:10px; height:10px; border-radius:50%; background:${cB}; box-shadow:0 0 5px ${cB};"></div></div>
          </div>
        </div>
-       ${dragHandle}
+       ${reorderUI}
      `;
     container.appendChild(div);
   });
   calcStandings();
+}
+
+async function moveMatch(e, index, dir) {
+  e.stopPropagation();
+  const currentMatch = currentMatches[index];
+  const targetIndex = index + dir;
+
+  // Boundary checks
+  if (targetIndex < 0 || targetIndex >= currentMatches.length) return;
+  const targetMatch = currentMatches[targetIndex];
+
+  // Don't swap with finals
+  if (targetMatch.match_type === "final") return;
+
+  // Midpoint Math
+  let newOrder;
+  if (dir === -1) {
+    // Moving UP
+    const prevOrder =
+      targetIndex > 0 ? currentMatches[targetIndex - 1].match_order : 0;
+    newOrder = (targetMatch.match_order + prevOrder) / 2;
+  } else {
+    // Moving DOWN
+    const nextOrder =
+      targetIndex < currentMatches.length - 1
+        ? currentMatches[targetIndex + 1].match_order
+        : targetMatch.match_order + 2;
+    newOrder = (targetMatch.match_order + nextOrder) / 2;
+  }
+
+  // Update locally immediately for speed
+  currentMatch.match_order = newOrder;
+  loadMatches(); // Re-sort and render locally
+
+  await fetch(`${API}/matches`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ matchId: currentMatch.id, newOrder }),
+  });
 }
 
 async function deleteMatch(e, id) {
@@ -746,9 +749,9 @@ function openMatchModal(m, tA, tB) {
   const cA = tA ? tA.jersey_color : "#fff";
   const cB = tB ? tB.jersey_color : "#fff";
   const adminUI = isAdmin
-    ? `<div style="display:flex; justify-content:center; gap:10px; margin-top:20px;"><input id="scoreA" type="number" value="${
+    ? `<div style="display:flex; justify-content:center; gap:10px; margin-top:20px;"><input id="scoreA" type="number" inputmode="numeric" value="${
         m.score_a || 0
-      }" style="width:60px; font-size:20px; text-align:center;"><span style="font-size:20px; align-self:center;">-</span><input id="scoreB" type="number" value="${
+      }" style="width:60px; font-size:20px; text-align:center;"><span style="font-size:20px; align-self:center;">-</span><input id="scoreB" type="number" inputmode="numeric" value="${
         m.score_b || 0
       }" style="width:60px; font-size:20px; text-align:center;"></div><button class="btn btn-primary" onclick="saveScore('${
         m.id

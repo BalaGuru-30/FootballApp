@@ -7,7 +7,6 @@
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
     <title>League Manager</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     <style>
       /* VARIABLES */
       :root {
@@ -162,6 +161,7 @@
         color: var(--text-dim);
         display: flex;
         justify-content: space-between;
+        align-items: center;
       }
       .match-body {
         padding: 16px;
@@ -191,28 +191,30 @@
         border: 1px solid #16a34a;
       }
 
-      /* DRAG HANDLE */
-      .drag-handle {
+      /* REORDER CONTROLS */
+      .reorder-controls {
+        display: flex;
+        flex-direction: column;
         width: 40px;
+        border-left: 1px solid rgba(255, 255, 255, 0.05);
         background: rgba(0, 0, 0, 0.2);
+      }
+      .reorder-btn {
+        flex: 1;
         display: flex;
         align-items: center;
         justify-content: center;
-        cursor: grab;
-        border-left: 1px solid rgba(255, 255, 255, 0.05);
-        touch-action: none;
-      }
-      .drag-handle::after {
-        content: "☰";
+        cursor: pointer;
         color: var(--text-dim);
-        font-size: 20px;
+        font-size: 12px;
+        transition: background 0.2s;
       }
-      .sortable-ghost {
-        opacity: 0.5;
-        background: var(--surface-light);
+      .reorder-btn:active {
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
       }
-      .final-match .drag-handle {
-        display: none;
+      .reorder-btn:first-child {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
       }
 
       /* ROSTER */
@@ -478,6 +480,7 @@
               <input
                 id="genRounds"
                 type="number"
+                inputmode="numeric"
                 value="1"
                 placeholder="Rounds"
                 style="width: 60px; margin: 0"
