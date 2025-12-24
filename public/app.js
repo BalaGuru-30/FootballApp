@@ -1,23 +1,48 @@
 const API = "/api";
 let token = localStorage.getItem("token");
-let isAdmin = false;
 
-// Check Admin Status on Load
-if (token) {
-  try {
-    const payload = JSON.parse(atob(token));
-    isAdmin = payload.isAdmin;
-    if (isAdmin) {
-      const form = document.getElementById("admin-match-form");
-      if (form) form.style.display = "block";
+// --- INITIALIZATION ---
+function init() {
+  const authSection = document.getElementById("auth-section");
+  const logoutBtn = document.getElementById("logoutBtn");
+  const adminControls = document.getElementById("admin-controls");
+
+  if (token) {
+    // User is logged in
+    authSection.classList.add("hidden");
+    logoutBtn.classList.remove("hidden");
+
+    try {
+      // Decode Token
+      const payload = JSON.parse(atob(token));
+
+      // If Admin, show admin controls
+      if (payload.isAdmin) {
+        adminControls.classList.remove("hidden");
+      }
+    } catch (e) {
+      console.error("Invalid token", e);
+      logout(); // Force logout if token is corrupt
     }
-  } catch (e) {
-    console.error("Invalid token");
+  } else {
+    // Not logged in
+    authSection.classList.remove("hidden");
+    logoutBtn.classList.add("hidden");
+    adminControls.classList.add("hidden");
   }
+
+  // Always load matches on start
+  loadMatches();
 }
 
+// --- UTILS ---
 function out(msg) {
-  document.getElementById("output").textContent = JSON.stringify(msg, null, 2);
+  const outEl = document.getElementById("output");
+  outEl.textContent = JSON.stringify(msg, null, 2);
+  // Clear message after 3 seconds so UI stays clean
+  setTimeout(() => {
+    outEl.textContent = "";
+  }, 3000);
 }
 
 function getVal(id) {
@@ -37,11 +62,12 @@ async function login() {
   });
   const data = await res.json();
   if (data.token) {
+    localStorage.setItem("token", data.token);
     token = data.token;
-    localStorage.setItem("token", token);
-    location.reload(); // Reload to show Admin UI
+    location.reload();
+  } else {
+    out(data);
   }
-  out(data);
 }
 
 async function signup() {
@@ -56,37 +82,39 @@ async function signup() {
   out(await res.json());
 }
 
+function logout() {
+  localStorage.removeItem("token");
+  location.reload();
+}
+
 // --- LOADERS ---
 async function loadTeams() {
   const res = await fetch(`${API}/teams`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Authorization: `Bearer ${token}` }, // Token optional for viewing? Adjust if needed
   });
   const teams = await res.json();
-  out(teams);
 
-  // Populate Dropdowns for Matches
+  // Populate Dropdowns if Admin
   const selA = document.getElementById("teamASelect");
   const selB = document.getElementById("teamBSelect");
 
   if (selA && selB) {
     selA.innerHTML = "<option value=''>Select Team A</option>";
     selB.innerHTML = "<option value=''>Select Team B</option>";
-
     teams.forEach((t) => {
       selA.innerHTML += `<option value="${t.id}">${t.name}</option>`;
       selB.innerHTML += `<option value="${t.id}">${t.name}</option>`;
     });
   }
+  out(teams); // For debugging, shows in bottom box
 }
 
 async function loadPlayers() {
-  const res = await fetch(`${API}/players`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const res = await fetch(`${API}/players`);
   out(await res.json());
 }
 
-// --- ACTIONS ---
+// --- ACTIONS (ADMIN) ---
 async function addTeam() {
   const name = prompt("Team name?");
   if (!name) return;
@@ -147,26 +175,36 @@ async function loadMatches() {
 
   const container = document.getElementById("matches-list");
   if (!container) return;
-
   container.innerHTML = "";
 
+  if (!matches || matches.length === 0) {
+    container.innerHTML =
+      "<div style='color:#64748b; text-align:center; padding:20px;'>No matches scheduled</div>";
+    return;
+  }
+
   matches.forEach((m) => {
-    const date = new Date(m.start_time).toLocaleString();
+    const date = new Date(m.start_time).toLocaleString(undefined, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
     const div = document.createElement("div");
     div.className = "card";
     div.innerHTML = `
-      <div style="display:flex; justify-content:space-between; color:#94a3b8; font-size:14px; margin-bottom:8px;">
-        <span>${date}</span>
-      </div>
-      <div style="display:flex; justify-content:space-between; align-items:center; font-size:18px; font-weight:bold;">
-        <span style="width:40%; text-align:left;">${m.team_a_name}</span>
-        <span style="color:#22c55e;">VS</span>
-        <span style="width:40%; text-align:right;">${m.team_b_name}</span>
+      <div style="font-size:13px; color:#94a3b8; margin-bottom:8px;">${date}</div>
+      <div class="flex-between" style="font-weight:700; font-size:18px;">
+        <span style="color:#cbd5e1;">${m.team_a_name}</span>
+        <span style="color:#22c55e; font-size:14px;">VS</span>
+        <span style="color:#cbd5e1;">${m.team_b_name}</span>
       </div>
     `;
     container.appendChild(div);
   });
 }
 
-// Init
-loadMatches();
+// Run on Load
+init();
