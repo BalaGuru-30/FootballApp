@@ -1,17 +1,13 @@
 const { supabase } = require("./_supabase");
 
-function getUser(req) {
-  try {
-    const auth = req.headers.authorization;
-    return JSON.parse(Buffer.from(auth.split(" ")[1], "base64").toString());
-  } catch {
-    return null;
-  }
+function auth(req) {
+  return JSON.parse(
+    Buffer.from(req.headers.authorization.split(" ")[1], "base64")
+  );
 }
 
-module.exports = async function handler(req, res) {
-  const user = getUser(req);
-  if (!user) return res.status(401).json({ error: "Unauthorized" });
+module.exports = async (req, res) => {
+  const user = auth(req);
 
   if (req.method === "GET") {
     const { data } = await supabase.from("players").select("*");
@@ -19,20 +15,12 @@ module.exports = async function handler(req, res) {
   }
 
   if (req.method === "POST") {
-    if (!user.isAdmin) {
-      return res.status(403).json({ error: "Admin only" });
-    }
+    if (!user.isAdmin) return res.status(403).json({ error: "Admin only" });
 
     const { name } = req.body;
-    const { data, error } = await supabase
-      .from("players")
-      .insert({ name })
-      .select()
-      .single();
+    if (!name) return res.status(400).json({ error: "Name required" });
 
-    if (error) return res.status(400).json(error);
-    return res.json(data);
+    await supabase.from("players").insert({ name });
+    return res.json({ message: "Player added" });
   }
-
-  res.status(405).end();
 };

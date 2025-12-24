@@ -1,48 +1,18 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Football App</title>
-    <link rel="stylesheet" href="style.css" />
-  </head>
-  <body>
-    <!-- LOGIN / SIGNUP -->
-    <div id="login-screen" class="screen">
-      <h1>⚽ Football App</h1>
-      <input id="username" placeholder="Username" />
-      <input id="password" type="password" placeholder="Password" />
+<h2>⚽ Football App</h2>
 
-      <button onclick="login()">Login</button>
-      <button onclick="signup()" class="secondary">Sign up</button>
+<input id="username" placeholder="Username" />
+<input id="password" type="password" placeholder="Password" />
 
-      <p id="login-error"></p>
-    </div>
+<button onclick="login()">Login</button>
+<button onclick="signup()">Sign Up</button>
 
-    <!-- PLAYER LINK -->
-    <div id="link-player-screen" class="screen hidden">
-      <h2>Player Found</h2>
-      <p id="player-question"></p>
-      <button onclick="confirmLink()">Yes, this is me</button>
-      <button onclick="skipLink()" class="secondary">No</button>
-    </div>
+<hr />
 
-    <!-- DASHBOARD -->
-    <div id="dashboard" class="screen hidden">
-      <h2>Dashboard</h2>
+<button onclick="loadPlayers()">View Players</button>
+<button onclick="loadTeams()">View Teams</button>
+<button onclick="addPlayer()">Add Player (Admin)</button>
+<button onclick="addTeam()">Add Team (Admin)</button>
 
-      <div id="admin-actions" class="hidden">
-        <button onclick="addPlayer()">➕ Add Player</button>
-        <button onclick="addTeam()">➕ Add Team</button>
-      </div>
+<pre id="output"></pre>
 
-      <button onclick="loadPlayers()">👥 View Players</button>
-      <button onclick="loadTeams()">👕 View Teams</button>
-      <button onclick="logout()" class="secondary">Logout</button>
-
-      <div id="content"></div>
-    </div>
-
-    <script src="app.js"></script>
-  </body>
-</html>
+<script src="app.js"></script>

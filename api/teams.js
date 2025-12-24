@@ -1,42 +1,26 @@
 const { supabase } = require("./_supabase");
 
-function getUser(req) {
-  try {
-    const auth = req.headers.authorization;
-    return JSON.parse(Buffer.from(auth.split(" ")[1], "base64").toString());
-  } catch {
-    return null;
-  }
+function auth(req) {
+  return JSON.parse(
+    Buffer.from(req.headers.authorization.split(" ")[1], "base64")
+  );
 }
 
-module.exports = async function handler(req, res) {
-  const user = getUser(req);
-  if (!user) return res.status(401).json({ error: "Unauthorized" });
-
-  if (req.method === "POST") {
-    if (!user.isAdmin) return res.status(403).json({ error: "Admin only" });
-
-    const { name, color, playerIds } = req.body;
-
-    const { data: team } = await supabase
-      .from("teams")
-      .insert({ name, color })
-      .select()
-      .single();
-
-    const links = playerIds.map((pid) => ({
-      team_id: team.id,
-      player_id: pid,
-    }));
-
-    await supabase.from("team_players").insert(links);
-    return res.json(team);
-  }
+module.exports = async (req, res) => {
+  const user = auth(req);
 
   if (req.method === "GET") {
     const { data } = await supabase.from("teams").select("*");
     return res.json(data);
   }
 
-  res.status(405).end();
+  if (req.method === "POST") {
+    if (!user.isAdmin) return res.status(403).json({ error: "Admin only" });
+
+    const { name } = req.body;
+    if (!name) return res.status(400).json({ error: "Name required" });
+
+    await supabase.from("teams").insert({ name });
+    return res.json({ message: "Team added" });
+  }
 };
