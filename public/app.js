@@ -31,13 +31,12 @@ function init() {
   // Real-time polling
   setInterval(() => {
     if (!document.hidden) {
-      // Refresh Tournament Details
       if (activeTournamentId) {
+        // Refresh actively
         if (activeTab === "fixtures") loadMatches(true);
         if (activeTab === "teams") loadTeams(true);
         if (activeTab === "standings") loadMatches(true);
       }
-      // Refresh Global Players
       if (
         document
           .getElementById("section-players")
@@ -294,12 +293,12 @@ async function loadTeams(silent = false) {
 
   const sA = document.getElementById("teamASelect");
   const sB = document.getElementById("teamBSelect");
-  const filterSel = document.getElementById("fixtureFilter");
 
   if (sA.innerHTML.length < 50 || !silent) {
+    sA.innerHTML = "<option value=''>Select Team</option>";
+    sB.innerHTML = "<option value=''>Select Team</option>";
+    const filterSel = document.getElementById("fixtureFilter");
     const allOpt = "<option value='all'>Show All Teams</option>";
-    sA.innerHTML = "<option value=''>Team A</option>";
-    sB.innerHTML = "<option value=''>Team B</option>";
     if (document.activeElement !== filterSel) filterSel.innerHTML = allOpt;
 
     currentTeams.forEach((t) => {
@@ -318,7 +317,6 @@ async function loadTeams(silent = false) {
 function renderTeamList(container) {
   container.innerHTML = "";
   currentTeams.forEach((t) => {
-    // Generate Roster with Correct Name Confirmation
     const rosterHtml = t.team_players
       .map(
         (tp) => `
@@ -511,9 +509,11 @@ async function clearFixtures() {
 async function scheduleMatch() {
   const tA = document.getElementById("teamASelect").value;
   const tB = document.getElementById("teamBSelect").value;
-  const d = document.getElementById("matchDate").value || activeTournamentDate;
   const type = document.getElementById("matchTypeSelect").value;
+
   if (!tA || !tB) return alert("Select teams");
+  if (tA === tB) return alert("Teams must be different");
+
   await fetch(`${API}/matches`, {
     method: "POST",
     headers: {
@@ -523,13 +523,17 @@ async function scheduleMatch() {
     body: JSON.stringify({
       teamAId: tA,
       teamBId: tB,
-      startTime: d,
+      startTime: activeTournamentDate,
       tournamentId: activeTournamentId,
       matchType: type,
     }),
   });
+
+  // Clear and Collapse
   document.getElementById("teamASelect").value = "";
   document.getElementById("teamBSelect").value = "";
+  document.getElementById("addMatchDetails").removeAttribute("open");
+
   showToast("Match Created");
   loadMatches();
 }
@@ -538,22 +542,35 @@ async function loadMatches(silent = false) {
   const res = await fetch(`${API}/matches?tournamentId=${activeTournamentId}`);
   currentMatches = await res.json();
 
+  // Sorting: Finals top, then order
   currentMatches.sort((a, b) => {
     if (a.match_type === "final" && b.match_type !== "final") return -1;
     if (a.match_type !== "final" && b.match_type === "final") return 1;
     return a.match_order - b.match_order;
   });
 
-  if (!silent) renderMatchList(document.getElementById("matches-list"));
-  else if (document.activeElement.tagName !== "INPUT")
+  if (!silent) {
     renderMatchList(document.getElementById("matches-list"));
-
-  if (isAdmin)
-    document.getElementById("matchDate").value = activeTournamentDate;
+    renderFinalsSection();
+  } else if (document.activeElement.tagName !== "INPUT") {
+    renderMatchList(document.getElementById("matches-list"));
+    renderFinalsSection();
+  }
 }
 
 function renderMatchList(container) {
   container.innerHTML = "";
+  let matchCounter = 0;
+
+  const hasFinal = currentMatches.some((m) => m.match_type === "final");
+  // Update Dropdown options based on existing final
+  const typeSel = document.getElementById("matchTypeSelect");
+  if (hasFinal) {
+    typeSel.innerHTML = "<option value='normal'>League Match</option>";
+  } else {
+    typeSel.innerHTML =
+      "<option value='normal'>League Match</option><option value='final'>Finals</option>";
+  }
 
   if (isAdmin && currentMatches.length > 0) {
     document.getElementById("btnGen").disabled = true;
@@ -562,8 +579,6 @@ function renderMatchList(container) {
     document.getElementById("btnGen").disabled = false;
     document.getElementById("btnGen").style.opacity = "1";
   }
-
-  let matchCounter = 0;
 
   currentMatches.forEach((m, index) => {
     if (currentFilterTeamId !== "all") {
@@ -590,7 +605,7 @@ function renderMatchList(container) {
       ? `<span style="color:var(--danger); cursor:pointer;" class="delete-btn" onclick="deleteMatch(event, '${m.id}')">🗑</span>`
       : "";
 
-    // RE-IMPLEMENT ARROWS FOR REORDERING
+    // ARROW CONTROLS (Updated Logic)
     let reorderUI =
       isAdmin && !isFinal
         ? `
@@ -654,9 +669,9 @@ async function moveMatch(e, index, dir) {
     newOrder = (targetMatch.match_order + nextOrder) / 2;
   }
 
-  // Update locally immediately for speed
+  // Optimistic Update
   currentMatch.match_order = newOrder;
-  loadMatches(); // Re-sort and render locally
+  loadMatches(true);
 
   await fetch(`${API}/matches`, {
     method: "PUT",
@@ -682,6 +697,95 @@ async function deleteMatch(e, id) {
   loadMatches();
 }
 
+function renderFinalsSection() {
+  const container = document.getElementById("finals-display-area");
+  const finalMatch = currentMatches.find((m) => m.match_type === "final");
+
+  if (finalMatch) {
+    const tA = currentTeams.find((t) => t.id === finalMatch.team_a_id);
+    const tB = currentTeams.find((t) => t.id === finalMatch.team_b_id);
+    const cA = tA ? tA.jersey_color : "#fff";
+    const cB = tB ? tB.jersey_color : "#fff";
+    const score =
+      finalMatch.status === "finished"
+        ? `${finalMatch.score_a} - ${finalMatch.score_b}`
+        : "VS";
+
+    container.innerHTML = `
+       <div class="match-card final-match" onclick="openMatchModal({id:'${
+         finalMatch.id
+       }', ...${JSON.stringify(finalMatch).replace(
+      /"/g,
+      "&quot;"
+    )}}, null, null)">
+         <div class="match-content">
+           <div class="match-body">
+             <div class="team-info"><div style="width:10px; height:10px; border-radius:50%; background:${cA};"></div><span style="font-weight:bold;">${
+      finalMatch.team_a_name
+    }</span></div>
+             <div class="score-badge">${score}</div>
+             <div class="team-info" style="justify-content:flex-end;"><span style="font-weight:bold;">${
+               finalMatch.team_b_name
+             }</span><div style="width:10px; height:10px; border-radius:50%; background:${cB};"></div></div>
+           </div>
+         </div>
+       </div>`;
+  } else {
+    const allFinished =
+      currentMatches.length > 0 &&
+      currentMatches.every(
+        (m) => m.status === "finished" && m.match_type !== "final"
+      );
+    if (allFinished && isAdmin) {
+      container.innerHTML = `<div style="text-align:center;"><button class="btn btn-primary" onclick="autoGenerateFinals()">🏆 Create Finals (Top 2)</button></div>`;
+    } else {
+      container.innerHTML = `<div style="text-align:center; color:#64748b; padding:20px; border:1px dashed #334155; border-radius:12px;">TBD vs TBD</div>`;
+    }
+  }
+}
+
+async function autoGenerateFinals() {
+  if (!confirm("Create Finals between Top 2 teams?")) return;
+  // Identify top 2 from league table logic (simplified here as we have sort logic in calcStandings, but need raw data)
+  // Re-run stat calculation locally:
+  const stats = {};
+  currentTeams.forEach((t) => (stats[t.id] = { id: t.id, pts: 0, gd: 0 }));
+  currentMatches.forEach((m) => {
+    if (m.status === "finished" && m.match_type !== "final") {
+      const a = m.team_a_id,
+        b = m.team_b_id;
+      stats[a].gd += m.score_a - m.score_b;
+      stats[b].gd += m.score_b - m.score_a;
+      if (m.score_a > m.score_b) stats[a].pts += 3;
+      else if (m.score_b > m.score_a) stats[b].pts += 3;
+      else {
+        stats[a].pts++;
+        stats[b].pts++;
+      }
+    }
+  });
+  const sorted = Object.values(stats).sort(
+    (a, b) => b.pts - a.pts || b.gd - a.gd
+  );
+  if (sorted.length < 2) return alert("Not enough teams for finals");
+
+  await fetch(`${API}/matches`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      teamAId: sorted[0].id,
+      teamBId: sorted[1].id,
+      startTime: activeTournamentDate,
+      tournamentId: activeTournamentId,
+      matchType: "final",
+    }),
+  });
+  loadMatches();
+}
+
 function calcStandings() {
   const stats = {};
   currentTeams.forEach(
@@ -698,7 +802,8 @@ function calcStandings() {
       })
   );
   currentMatches.forEach((m) => {
-    if (m.status === "finished") {
+    if (m.status === "finished" && m.match_type !== "final") {
+      // Exclude finals from table
       const a = m.team_a_id,
         b = m.team_b_id;
       if (stats[a] && stats[b]) {
@@ -746,6 +851,10 @@ function calcStandings() {
 
 function openMatchModal(m, tA, tB) {
   openModal("match");
+  // Find teams if passed as null (from finals click)
+  if (!tA) tA = currentTeams.find((t) => t.id === m.team_a_id);
+  if (!tB) tB = currentTeams.find((t) => t.id === m.team_b_id);
+
   const cA = tA ? tA.jersey_color : "#fff";
   const cB = tB ? tB.jersey_color : "#fff";
   const adminUI = isAdmin
