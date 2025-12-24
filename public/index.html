@@ -36,13 +36,33 @@
         </div>
       </div>
 
-      <hr />
-
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px">
+      <div
+        style="
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 10px;
+          margin-top: 20px;
+        "
+      >
         <button class="btn-secondary" onclick="loadPlayers()">
           👥 Players
         </button>
         <button class="btn-secondary" onclick="loadTeams()">🛡️ Teams</button>
+      </div>
+
+      <div
+        id="link-section"
+        class="hidden card"
+        style="margin-top: 20px; border: 1px solid #3b82f6"
+      >
+        <h4 style="margin-top: 0; color: #3b82f6">🔗 Link Your Profile</h4>
+        <p style="font-size: 13px; color: #cbd5e1">
+          Are you one of these players? Claim your profile.
+        </p>
+        <select id="linkPlayerSelect">
+          <option>Select Yourself...</option>
+        </select>
+        <button class="btn-primary" onclick="requestLink()">That's Me!</button>
       </div>
 
       <div
@@ -55,6 +75,16 @@
         "
       >
         <h4 style="color: #f59e0b">⚡ Admin Controls</h4>
+
+        <div
+          id="approval-box"
+          class="card hidden"
+          style="border: 1px solid #f59e0b"
+        >
+          <h4 style="margin: 0">🔔 Pending Approvals</h4>
+          <div id="approval-list"></div>
+        </div>
+
         <button class="btn-admin" onclick="addPlayer()">+ Add Player</button>
         <button class="btn-admin" onclick="addTeam()">+ Add Team</button>
 

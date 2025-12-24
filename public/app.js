@@ -6,6 +6,7 @@ function init() {
   const authSection = document.getElementById("auth-section");
   const logoutBtn = document.getElementById("logoutBtn");
   const adminControls = document.getElementById("admin-controls");
+  const linkSection = document.getElementById("link-section");
 
   if (token) {
     // User is logged in
@@ -13,25 +14,28 @@ function init() {
     logoutBtn.classList.remove("hidden");
 
     try {
-      // Decode Token
       const payload = JSON.parse(atob(token));
 
-      // If Admin, show admin controls
       if (payload.isAdmin) {
         adminControls.classList.remove("hidden");
+        loadApprovals(); // Admin checks for pending requests
+      } else {
+        // Normal user? Show link section
+        linkSection.classList.remove("hidden");
+        loadPlayersForLink();
       }
     } catch (e) {
       console.error("Invalid token", e);
-      logout(); // Force logout if token is corrupt
+      logout();
     }
   } else {
     // Not logged in
     authSection.classList.remove("hidden");
     logoutBtn.classList.add("hidden");
     adminControls.classList.add("hidden");
+    linkSection.classList.add("hidden");
   }
 
-  // Always load matches on start
   loadMatches();
 }
 
@@ -39,15 +43,13 @@ function init() {
 function out(msg) {
   const outEl = document.getElementById("output");
   outEl.textContent = JSON.stringify(msg, null, 2);
-  // Clear message after 3 seconds so UI stays clean
   setTimeout(() => {
     outEl.textContent = "";
   }, 3000);
 }
 
 function getVal(id) {
-  const el = document.getElementById(id);
-  return el ? el.value : "";
+  return document.getElementById(id).value;
 }
 
 // --- AUTH ---
@@ -87,14 +89,89 @@ function logout() {
   location.reload();
 }
 
-// --- LOADERS ---
+// --- LINKING (USER SIDE) ---
+async function loadPlayersForLink() {
+  const res = await fetch(`${API}/players`);
+  const players = await res.json();
+
+  const sel = document.getElementById("linkPlayerSelect");
+  sel.innerHTML = "<option value=''>Select Yourself...</option>";
+  players.forEach((p) => {
+    sel.innerHTML += `<option value="${p.id}">${p.name}</option>`;
+  });
+}
+
+async function requestLink() {
+  const playerId = getVal("linkPlayerSelect");
+  if (!playerId) return alert("Select a player!");
+
+  const res = await fetch(`${API}/link-request`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ playerId }),
+  });
+
+  const data = await res.json();
+  out(data);
+  if (data.message) {
+    alert("Request Sent! Ask Admin to approve.");
+    document.getElementById("link-section").classList.add("hidden");
+  }
+}
+
+// --- APPROVALS (ADMIN SIDE) ---
+async function loadApprovals() {
+  const res = await fetch(`${API}/admin-approvals`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const requests = await res.json();
+
+  const box = document.getElementById("approval-box");
+  const list = document.getElementById("approval-list");
+  list.innerHTML = "";
+
+  if (requests.length > 0) {
+    box.classList.remove("hidden");
+    requests.forEach((req) => {
+      const div = document.createElement("div");
+      div.className = "flex-between";
+      div.style =
+        "background:#334155; padding:10px; border-radius:6px; margin-top:5px; font-size:14px;";
+      div.innerHTML = `
+        <span><b>${req.username}</b> wants to be <b>${req.players.name}</b></span>
+        <button onclick="approveUser('${req.id}')" style="width:auto; padding:5px 10px; font-size:12px; background:#22c55e; margin:0;">Approve</button>
+      `;
+      list.appendChild(div);
+    });
+  } else {
+    box.classList.add("hidden");
+  }
+}
+
+async function approveUser(targetUserId) {
+  const res = await fetch(`${API}/admin-approvals`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ targetUserId }),
+  });
+  const data = await res.json();
+  out(data);
+  loadApprovals(); // Refresh list
+}
+
+// --- STANDARD LOADERS ---
 async function loadTeams() {
   const res = await fetch(`${API}/teams`, {
-    headers: { Authorization: `Bearer ${token}` }, // Token optional for viewing? Adjust if needed
+    headers: { Authorization: `Bearer ${token}` },
   });
   const teams = await res.json();
 
-  // Populate Dropdowns if Admin
   const selA = document.getElementById("teamASelect");
   const selB = document.getElementById("teamBSelect");
 
@@ -106,7 +183,7 @@ async function loadTeams() {
       selB.innerHTML += `<option value="${t.id}">${t.name}</option>`;
     });
   }
-  out(teams); // For debugging, shows in bottom box
+  out(teams);
 }
 
 async function loadPlayers() {
@@ -163,16 +240,13 @@ async function scheduleMatch() {
     },
     body: JSON.stringify({ teamAId, teamBId, startTime }),
   });
-
-  const data = await res.json();
-  out(data);
-  if (data.id) loadMatches();
+  out(await res.json());
+  loadMatches();
 }
 
 async function loadMatches() {
   const res = await fetch(`${API}/matches`);
   const matches = await res.json();
-
   const container = document.getElementById("matches-list");
   if (!container) return;
   container.innerHTML = "";
@@ -191,7 +265,6 @@ async function loadMatches() {
       hour: "2-digit",
       minute: "2-digit",
     });
-
     const div = document.createElement("div");
     div.className = "card";
     div.innerHTML = `
@@ -206,5 +279,5 @@ async function loadMatches() {
   });
 }
 
-// Run on Load
+// Run
 init();
