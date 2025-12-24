@@ -7,28 +7,38 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <!-- LOGIN -->
+    <!-- LOGIN / SIGNUP -->
     <div id="login-screen" class="screen">
       <h1>⚽ Football App</h1>
       <input id="username" placeholder="Username" />
       <input id="password" type="password" placeholder="Password" />
+
       <button onclick="login()">Login</button>
+      <button onclick="signup()" class="secondary">Sign up</button>
+
       <p id="login-error"></p>
     </div>
 
+    <!-- PLAYER LINK -->
     <div id="link-player-screen" class="screen hidden">
       <h2>Player Found</h2>
       <p id="player-question"></p>
       <button onclick="confirmLink()">Yes, this is me</button>
-      <button onclick="skipLink()">No</button>
+      <button onclick="skipLink()" class="secondary">No</button>
     </div>
 
     <!-- DASHBOARD -->
     <div id="dashboard" class="screen hidden">
       <h2>Dashboard</h2>
-      <button onclick="loadPlayers()">👥 Players</button>
-      <button onclick="loadMatches()">⚽ Matches</button>
-      <button onclick="logout()">Logout</button>
+
+      <div id="admin-actions" class="hidden">
+        <button onclick="addPlayer()">➕ Add Player</button>
+        <button onclick="addTeam()">➕ Add Team</button>
+      </div>
+
+      <button onclick="loadPlayers()">👥 View Players</button>
+      <button onclick="loadTeams()">👕 View Teams</button>
+      <button onclick="logout()" class="secondary">Logout</button>
 
       <div id="content"></div>
     </div>

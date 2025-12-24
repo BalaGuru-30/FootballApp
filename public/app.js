@@ -4,36 +4,37 @@ let token = localStorage.getItem("token");
 let user = null;
 let foundPlayer = null;
 
-// DOM references
+// DOM
 const loginScreen = document.getElementById("login-screen");
-const dashboard = document.getElementById("dashboard");
 const linkScreen = document.getElementById("link-player-screen");
+const dashboard = document.getElementById("dashboard");
 const content = document.getElementById("content");
+const adminActions = document.getElementById("admin-actions");
 
 const usernameInput = document.getElementById("username");
 const passwordInput = document.getElementById("password");
 
-// Auto-login if token exists
+// Auto login
 if (token) {
   user = JSON.parse(atob(token));
   checkPlayerLink();
 }
 
-/* ---------------- AUTH ---------------- */
+/* ---------- AUTH ---------- */
 
 async function login() {
-  const username = usernameInput.value;
-  const password = passwordInput.value;
-
   const res = await fetch(`${API}/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({
+      username: usernameInput.value,
+      password: passwordInput.value,
+    }),
   });
 
   const data = await res.json();
   if (!data.token) {
-    alert(data.error);
+    document.getElementById("login-error").innerText = data.error;
     return;
   }
 
@@ -45,13 +46,13 @@ async function login() {
 }
 
 async function signup() {
-  const username = usernameInput.value;
-  const password = passwordInput.value;
-
   await fetch(`${API}/signup`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({
+      username: usernameInput.value,
+      password: passwordInput.value,
+    }),
   });
 
   await login();
@@ -62,13 +63,10 @@ function logout() {
   location.reload();
 }
 
-/* ---------------- PLAYER LINKING ---------------- */
+/* ---------- PLAYER LINK ---------- */
 
 async function checkPlayerLink() {
-  if (user.playerId) {
-    showDashboard();
-    return;
-  }
+  if (user.playerId) return showDashboard();
 
   const res = await fetch(`${API}/players`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -97,7 +95,6 @@ async function confirmLink() {
     },
     body: JSON.stringify({ playerId: foundPlayer.id }),
   });
-
   showDashboard();
 }
 
@@ -105,22 +102,51 @@ function skipLink() {
   showDashboard();
 }
 
-/* ---------------- DASHBOARD ---------------- */
+/* ---------- DASHBOARD ---------- */
 
 function showDashboard() {
   loginScreen.classList.add("hidden");
   linkScreen.classList.add("hidden");
   dashboard.classList.remove("hidden");
 
-  content.innerHTML = `
-    <div class="card">
-      Logged in as <b>${user.username}</b>
-      ${user.isAdmin ? " (Admin)" : ""}
-    </div>
-  `;
+  if (user.isAdmin) adminActions.classList.remove("hidden");
 }
 
-/* ---------------- PLAYERS ---------------- */
+/* ---------- ADMIN ACTIONS ---------- */
+
+async function addPlayer() {
+  const name = prompt("Enter player name:");
+  if (!name) return;
+
+  await fetch(`${API}/players`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ name }),
+  });
+
+  loadPlayers();
+}
+
+async function addTeam() {
+  const name = prompt("Enter team name:");
+  if (!name) return;
+
+  await fetch(`${API}/teams`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ name }),
+  });
+
+  loadTeams();
+}
+
+/* ---------- VIEWS ---------- */
 
 async function loadPlayers() {
   const res = await fetch(`${API}/players`, {
@@ -135,22 +161,15 @@ async function loadPlayers() {
   });
 }
 
-/* ---------------- MATCHES ---------------- */
-
-async function loadMatches() {
-  const res = await fetch(`${API}/matches`, {
+async function loadTeams() {
+  const res = await fetch(`${API}/teams`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 
-  const matches = await res.json();
-  content.innerHTML = "<h3>Matches</h3>";
+  const teams = await res.json();
+  content.innerHTML = "<h3>Teams</h3>";
 
-  matches.forEach((m) => {
-    content.innerHTML += `
-      <div class="card">
-        ${m.team_a} vs ${m.team_b}<br/>
-        ${m.score_a} : ${m.score_b}
-      </div>
-    `;
+  teams.forEach((t) => {
+    content.innerHTML += `<div class="card">${t.name}</div>`;
   });
 }
