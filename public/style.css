@@ -47,3 +47,17 @@ button:active {
   border-radius: 12px;
   margin-bottom: 10px;
 }
+
+.score {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 22px;
+}
+
+.score button {
+  width: 48px;
+  height: 48px;
+  font-size: 24px;
+  margin: 0 5px;
+}
