@@ -1,19 +1,25 @@
 const API = "/api";
+
 let token = localStorage.getItem("token");
 let user = null;
 let foundPlayer = null;
 
+// DOM references
 const loginScreen = document.getElementById("login-screen");
 const dashboard = document.getElementById("dashboard");
 const linkScreen = document.getElementById("link-player-screen");
+const content = document.getElementById("content");
 
 const usernameInput = document.getElementById("username");
 const passwordInput = document.getElementById("password");
 
+// Auto-login if token exists
 if (token) {
   user = JSON.parse(atob(token));
-  showDashboard();
+  checkPlayerLink();
 }
+
+/* ---------------- AUTH ---------------- */
 
 async function login() {
   const username = usernameInput.value;
@@ -26,7 +32,10 @@ async function login() {
   });
 
   const data = await res.json();
-  if (!data.token) return alert(data.error);
+  if (!data.token) {
+    alert(data.error);
+    return;
+  }
 
   token = data.token;
   user = JSON.parse(atob(token));
@@ -36,25 +45,36 @@ async function login() {
 }
 
 async function signup() {
+  const username = usernameInput.value;
+  const password = passwordInput.value;
+
   await fetch(`${API}/signup`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      username: usernameInput.value,
-      password: passwordInput.value,
-    }),
+    body: JSON.stringify({ username, password }),
   });
-  login();
+
+  await login();
 }
 
+function logout() {
+  localStorage.removeItem("token");
+  location.reload();
+}
+
+/* ---------------- PLAYER LINKING ---------------- */
+
 async function checkPlayerLink() {
-  if (user.playerId) return showDashboard();
+  if (user.playerId) {
+    showDashboard();
+    return;
+  }
 
   const res = await fetch(`${API}/players`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  const players = await res.json();
 
+  const players = await res.json();
   foundPlayer = players.find((p) => p.name === user.username);
 
   if (foundPlayer) {
@@ -62,7 +82,7 @@ async function checkPlayerLink() {
     linkScreen.classList.remove("hidden");
     document.getElementById(
       "player-question"
-    ).innerText = `A player named ${foundPlayer.name} exists. Are you this player?`;
+    ).innerText = `A player named ${foundPlayer.name} already exists. Are you this player?`;
   } else {
     showDashboard();
   }
@@ -77,6 +97,7 @@ async function confirmLink() {
     },
     body: JSON.stringify({ playerId: foundPlayer.id }),
   });
+
   showDashboard();
 }
 
@@ -84,8 +105,52 @@ function skipLink() {
   showDashboard();
 }
 
+/* ---------------- DASHBOARD ---------------- */
+
 function showDashboard() {
   loginScreen.classList.add("hidden");
   linkScreen.classList.add("hidden");
   dashboard.classList.remove("hidden");
+
+  content.innerHTML = `
+    <div class="card">
+      Logged in as <b>${user.username}</b>
+      ${user.isAdmin ? " (Admin)" : ""}
+    </div>
+  `;
+}
+
+/* ---------------- PLAYERS ---------------- */
+
+async function loadPlayers() {
+  const res = await fetch(`${API}/players`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  const players = await res.json();
+  content.innerHTML = "<h3>Players</h3>";
+
+  players.forEach((p) => {
+    content.innerHTML += `<div class="card">${p.name}</div>`;
+  });
+}
+
+/* ---------------- MATCHES ---------------- */
+
+async function loadMatches() {
+  const res = await fetch(`${API}/matches`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  const matches = await res.json();
+  content.innerHTML = "<h3>Matches</h3>";
+
+  matches.forEach((m) => {
+    content.innerHTML += `
+      <div class="card">
+        ${m.team_a} vs ${m.team_b}<br/>
+        ${m.score_a} : ${m.score_b}
+      </div>
+    `;
+  });
 }
