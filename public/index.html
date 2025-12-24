@@ -78,12 +78,10 @@
         background: var(--success);
         color: #000;
       }
-      /* FIXED: Solid Red Background for visibility */
       .btn-danger {
         background: var(--danger);
         color: white;
       }
-
       .btn-icon {
         background: transparent;
         color: var(--text-dim);
@@ -215,7 +213,25 @@
       }
       .final-match .drag-handle {
         display: none;
-      } /* Hide handle for finals */
+      }
+
+      /* ROSTER */
+      .roster-tag {
+        display: inline-flex;
+        align-items: center;
+        background: rgba(255, 255, 255, 0.1);
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        margin: 2px;
+      }
+      .roster-rm {
+        margin-left: 5px;
+        color: var(--danger);
+        cursor: pointer;
+        font-weight: bold;
+        padding: 0 4px;
+      }
 
       /* TABLE */
       table {
@@ -257,7 +273,6 @@
         box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
       }
 
-      /* TOAST */
       #toast {
         position: fixed;
         bottom: 30px;
@@ -477,9 +492,14 @@
               <button
                 class="btn btn-danger"
                 onclick="clearFixtures()"
-                style="width: auto"
+                style="
+                  width: 50px;
+                  display: flex;
+                  justify-content: center;
+                  align-items: center;
+                "
               >
-                🗑 Clear All
+                🗑
               </button>
             </div>
 

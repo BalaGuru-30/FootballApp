@@ -44,11 +44,10 @@ module.exports = async function handler(req, res) {
     return res.json({ message: "Team created" });
   }
 
-  // PUT: Rename, Edit Color, Add Player
+  // PUT: Rename, Edit Color, Add/Remove Player
   if (req.method === "PUT") {
     const { action, teamId, name, jerseyColor, playerId } = req.body;
 
-    // NEW: Edit (Name + Color)
     if (action === "edit") {
       const { error } = await supabase
         .from("teams")
@@ -65,9 +64,19 @@ module.exports = async function handler(req, res) {
       if (error) return res.status(500).json({ error: error.message });
       return res.json({ message: "Player added" });
     }
+
+    // NEW: Remove Player Logic
+    if (action === "remove_player") {
+      const { error } = await supabase
+        .from("team_players")
+        .delete()
+        .match({ team_id: teamId, player_id: playerId });
+      if (error) return res.status(500).json({ error: error.message });
+      return res.json({ message: "Player removed" });
+    }
   }
 
-  // DELETE
+  // DELETE TEAM
   if (req.method === "DELETE") {
     const { id } = req.body;
     const { error } = await supabase.from("teams").delete().eq("id", id);

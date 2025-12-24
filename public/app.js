@@ -8,7 +8,7 @@ let currentTeams = [];
 let currentMatches = [];
 let activeTab = "standings";
 let currentFilterTeamId = "all";
-let sortableInstance = null; // Store Sortable instance
+let sortableInstance = null;
 
 function init() {
   if (token) {
@@ -29,17 +29,23 @@ function init() {
   }
   loadTournaments();
 
-  // Real-time polling
+  // REAL-TIME AUTO REFRESH
   setInterval(() => {
-    if (
-      activeTournamentId &&
-      !document.hidden &&
-      !sortableInstance?.option("disabled")
-    ) {
-      // Don't refresh while dragging
-      if (activeTab === "fixtures") loadMatches(true);
-      if (activeTab === "teams") loadTeams(true);
-      if (activeTab === "standings") loadMatches(true);
+    if (!document.hidden && !sortableInstance?.option("disabled")) {
+      // Refresh Tournament Details
+      if (activeTournamentId) {
+        if (activeTab === "fixtures") loadMatches(true);
+        if (activeTab === "teams") loadTeams(true);
+        if (activeTab === "standings") loadMatches(true);
+      }
+      // NEW: Refresh Global Players for everyone
+      if (
+        document
+          .getElementById("section-players")
+          .classList.contains("hidden") === false
+      ) {
+        loadAllPlayers();
+      }
     }
   }, 3000);
 }
@@ -53,15 +59,13 @@ function initSortable() {
     sortableInstance = new Sortable(el, {
       handle: ".drag-handle",
       animation: 150,
-      filter: ".final-match", // Finals cannot be dragged
+      filter: ".final-match",
       onEnd: async function (evt) {
-        // Logic to calculate new order
         const item = evt.item;
         const prevItem = item.previousElementSibling;
         const nextItem = item.nextElementSibling;
 
         const prevOrder = prevItem ? parseFloat(prevItem.dataset.order) : 0;
-        // If no next item, add 1. If next item exists, split the difference.
         const nextOrder = nextItem
           ? parseFloat(nextItem.dataset.order)
           : prevOrder + 2;
@@ -69,8 +73,10 @@ function initSortable() {
         const newOrder = (prevOrder + nextOrder) / 2;
         const matchId = item.dataset.id;
 
-        // Update Local Data immediately to prevent jump
         item.dataset.order = newOrder;
+
+        // Fix visuals immediately by reloading (prevents "Two Match 1s")
+        setTimeout(() => loadMatches(true), 50);
 
         await fetch(`${API}/matches`, {
           method: "PUT",
@@ -242,6 +248,14 @@ async function loadAllPlayers() {
   });
   const players = await res.json();
   const list = document.getElementById("all-players-list");
+
+  // Simple check to avoid redrawing if list hasn't changed (prevents flicker)
+  if (
+    list.childElementCount === players.length &&
+    document.activeElement.tagName !== "INPUT"
+  )
+    return players;
+
   list.innerHTML = "";
   players.forEach((p) => {
     const delBtn = isAdmin
@@ -348,7 +362,22 @@ async function loadTeams(silent = false) {
 function renderTeamList(container) {
   container.innerHTML = "";
   currentTeams.forEach((t) => {
-    const pNames = t.team_players.map((tp) => tp.players.name).join(", ");
+    // Generate Roster with Remove Button
+    const rosterHtml = t.team_players
+      .map(
+        (tp) => `
+        <span class="roster-tag">
+          ${tp.players.name} 
+          ${
+            isAdmin
+              ? `<span class="roster-rm" onclick="removePlayerFromTeam('${t.id}', '${tp.player_id}')">×</span>`
+              : ""
+          }
+        </span>
+     `
+      )
+      .join(" ");
+
     const adminControls = isAdmin
       ? `
        <div style="border-top:1px solid rgba(255,255,255,0.1); padding-top:8px; margin-top:8px; display:flex; justify-content:space-between; align-items:center;">
@@ -364,8 +393,8 @@ function renderTeamList(container) {
       t.jersey_color
     };">
        <div style="font-weight:bold;">${t.name}</div>
-       <div style="font-size:12px; color:#94a3b8; margin-top:5px;">${
-         pNames || "No players"
+       <div style="font-size:12px; color:#94a3b8; margin-top:5px; line-height: 1.6;">${
+         rosterHtml || "No players"
        }</div>
        ${adminControls}
      </div>`;
@@ -474,16 +503,26 @@ async function linkPlayer(teamId, playerId) {
   showToast("Player Added");
   loadTeams();
 }
+// NEW: Remove Player
+async function removePlayerFromTeam(teamId, playerId) {
+  if (!confirm("Remove player from this team?")) return;
+  await fetch(`${API}/teams`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ action: "remove_player", teamId, playerId }),
+  });
+  loadTeams();
+}
 
 // --- MATCHES ---
 function applyFixtureFilter() {
   currentFilterTeamId = document.getElementById("fixtureFilter").value;
   renderMatchList(document.getElementById("matches-list"));
-
-  // Disable drag if filtered
-  if (sortableInstance) {
+  if (sortableInstance)
     sortableInstance.option("disabled", currentFilterTeamId !== "all");
-  }
 }
 
 async function generateFixtures() {
@@ -541,7 +580,7 @@ async function loadMatches(silent = false) {
   const res = await fetch(`${API}/matches?tournamentId=${activeTournamentId}`);
   currentMatches = await res.json();
 
-  // SORT: Finals first, then by Order
+  // SORT
   currentMatches.sort((a, b) => {
     if (a.match_type === "final" && b.match_type !== "final") return -1;
     if (a.match_type !== "final" && b.match_type === "final") return 1;
@@ -557,8 +596,6 @@ async function loadMatches(silent = false) {
 
   if (isAdmin)
     document.getElementById("matchDate").value = activeTournamentDate;
-
-  // Re-init sortable after render
   if (!silent) initSortable();
 }
 
@@ -573,6 +610,9 @@ function renderMatchList(container) {
     document.getElementById("btnGen").style.opacity = "1";
   }
 
+  // FIX: Separate counter for display labels so they are always 1, 2, 3...
+  let matchCounter = 0;
+
   currentMatches.forEach((m) => {
     if (currentFilterTeamId !== "all") {
       if (
@@ -582,14 +622,17 @@ function renderMatchList(container) {
         return;
     }
 
+    const isFinal = m.match_type === "final";
+    if (!isFinal) matchCounter++; // Only increment for normal matches
+
     const tA = currentTeams.find((t) => t.id === m.team_a_id);
     const tB = currentTeams.find((t) => t.id === m.team_b_id);
     const cA = tA ? tA.jersey_color : "#fff";
     const cB = tB ? tB.jersey_color : "#fff";
-    const isFinal = m.match_type === "final";
     const score =
       m.status === "finished" ? `${m.score_a} - ${m.score_b}` : "VS";
     const scoreClass = m.status === "finished" ? "bg-green" : "";
+    const matchLabel = isFinal ? "🏆 GRAND FINAL" : `Match ${matchCounter}`; // Use counter, not DB order
 
     let delBtn = isAdmin
       ? `<span style="color:var(--danger); cursor:pointer;" class="delete-btn" onclick="deleteMatch(event, '${m.id}')">🗑</span>`
@@ -608,17 +651,11 @@ function renderMatchList(container) {
 
     div.innerHTML = `
        <div class="match-content">
-         <div class="match-header"><span>${
-           isFinal ? "🏆 GRAND FINAL" : "Match " + Math.round(m.match_order)
-         }</span> ${delBtn}</div>
+         <div class="match-header"><span>${matchLabel}</span> ${delBtn}</div>
          <div class="match-body">
-           <div class="team-info"><div style="width:10px; height:10px; border-radius:50%; background:${cA}; box-shadow:0 0 5px ${cA};"></div><span style="font-weight:600; font-size:13px;">${
-      m.team_a_name
-    }</span></div>
+           <div class="team-info"><div style="width:10px; height:10px; border-radius:50%; background:${cA}; box-shadow:0 0 5px ${cA};"></div><span style="font-weight:600; font-size:13px;">${m.team_a_name}</span></div>
            <div class="score-badge ${scoreClass}">${score}</div>
-           <div class="team-info" style="justify-content:flex-end;"><span style="font-weight:600; font-size:13px; text-align:right;">${
-             m.team_b_name
-           }</span><div style="width:10px; height:10px; border-radius:50%; background:${cB}; box-shadow:0 0 5px ${cB};"></div></div>
+           <div class="team-info" style="justify-content:flex-end;"><span style="font-weight:600; font-size:13px; text-align:right;">${m.team_b_name}</span><div style="width:10px; height:10px; border-radius:50%; background:${cB}; box-shadow:0 0 5px ${cB};"></div></div>
          </div>
        </div>
        ${dragHandle}
