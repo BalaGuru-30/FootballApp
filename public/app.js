@@ -15,6 +15,9 @@ function init() {
       const p = JSON.parse(atob(token));
       if (p.isAdmin) {
         isAdmin = true;
+        // CHANGE 1: Admin Title
+        document.getElementById("app-title").textContent =
+          "🏆 LeagueMgr (Admin mode)";
         document.getElementById("loginBtn").classList.add("hidden");
         document.getElementById("logoutBtn").classList.remove("hidden");
         document.getElementById("fab-add-tourn").classList.remove("hidden");
@@ -78,8 +81,11 @@ function forceCloseModal(id) {
 
 // --- AUTH ---
 function toggleLogin() {
+  // CHANGE 3: Toggle both modal and backdrop
   document.getElementById("login-modal").classList.toggle("hidden");
+  document.getElementById("login-backdrop").classList.toggle("hidden");
 }
+
 async function login() {
   const u = document.getElementById("uName").value;
   const p = document.getElementById("pWord").value;
@@ -92,6 +98,9 @@ async function login() {
   if (data.token) {
     localStorage.setItem("token", data.token);
     location.reload();
+  } else {
+    // CHANGE 2: Show specific error
+    alert(data.error || "Login Failed");
   }
 }
 function logout() {
@@ -627,11 +636,9 @@ function renderMatchList(container) {
   calcStandings();
 }
 
-// --- NEW: AUTO UPDATE FINALS LOGIC ---
 async function autoUpdateFinals() {
   if (!confirm("Update Finals with Top 2 Teams?")) return;
 
-  // Calculate Standings locally to get top 2
   const stats = {};
   currentTeams.forEach((t) => (stats[t.id] = { id: t.id, pts: 0, gd: 0 }));
   currentMatches.forEach((m) => {
@@ -656,11 +663,9 @@ async function autoUpdateFinals() {
   const topA = sorted[0].id;
   const topB = sorted[1].id;
 
-  // Check if finals exist
   const existingFinal = currentMatches.find((m) => m.match_type === "final");
 
   if (existingFinal) {
-    // UPDATE EXISTING (Uses new PUT logic)
     await fetch(`${API}/matches`, {
       method: "PUT",
       headers: {
@@ -675,7 +680,6 @@ async function autoUpdateFinals() {
     });
     showToast("Finals Updated!");
   } else {
-    // CREATE NEW
     await fetch(`${API}/matches`, {
       method: "POST",
       headers: {
@@ -742,15 +746,12 @@ async function moveMatch(e, index, dir) {
   const targetMatch = currentMatches[targetIndex];
   if (targetMatch.match_type === "final") return;
 
-  // FIXED MATH for Decimals
   let newOrder;
   if (dir === -1) {
-    // Up
     const prevOrder =
       targetIndex > 0 ? currentMatches[targetIndex - 1].match_order : 0;
     newOrder = (targetMatch.match_order + prevOrder) / 2;
   } else {
-    // Down
     const nextOrder =
       targetIndex < currentMatches.length - 1
         ? currentMatches[targetIndex + 1].match_order

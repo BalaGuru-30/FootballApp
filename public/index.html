@@ -84,7 +84,7 @@
       .btn-gold {
         background: var(--gold);
         color: black;
-      } /* NEW GOLD BTN */
+      }
 
       .btn-icon {
         background: transparent;
@@ -182,7 +182,6 @@
         width: 40%;
       }
 
-      /* FIXED: WIDER BADGE FOR 10-0 SCORES */
       .score-badge {
         background: var(--bg);
         padding: 6px 4px;
@@ -315,7 +314,7 @@
   <body>
     <div class="app-container">
       <div class="flex-between" style="margin-bottom: 20px">
-        <h2 style="margin: 0; font-weight: 800">🏆 LeagueMgr</h2>
+        <h2 id="app-title" style="margin: 0; font-weight: 800">🏆 LeagueMgr</h2>
         <div>
           <span id="loginBtn" onclick="toggleLogin()" class="btn-icon">🔒</span>
           <span
@@ -329,6 +328,20 @@
       </div>
 
       <div
+        id="login-backdrop"
+        class="hidden"
+        onclick="toggleLogin()"
+        style="
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100vw;
+          height: 100vh;
+          z-index: 55;
+        "
+      ></div>
+
+      <div
         id="login-modal"
         class="hidden"
         style="
@@ -340,6 +353,7 @@
           border-radius: 12px;
           z-index: 60;
           border: 1px solid var(--surface-light);
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
         "
       >
         <input id="uName" placeholder="User" /><input
@@ -465,7 +479,6 @@
               <tbody id="league-body"></tbody>
             </table>
           </div>
-
           <h3
             style="
               margin: 20px 0 10px 0;
