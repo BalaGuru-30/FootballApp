@@ -12,17 +12,14 @@ function getUser(req) {
 
 module.exports = async function handler(req, res) {
   const user = getUser(req);
-  const { tournamentId } = req.query; // Get ID from URL query ?tournamentId=...
+  const { tournamentId } = req.query;
 
   if (req.method === "GET") {
-    if (!tournamentId) return res.json([]); // Don't return anything if no tournament selected
-
-    const { data, error } = await supabase
+    if (!tournamentId) return res.json([]);
+    const { data } = await supabase
       .from("teams")
       .select("*")
       .eq("tournament_id", tournamentId);
-
-    if (error) return res.status(500).json({ error: error.message });
     return res.json(data);
   }
 
@@ -30,16 +27,16 @@ module.exports = async function handler(req, res) {
     if (!user || !user.isAdmin)
       return res.status(403).json({ error: "Admin only" });
 
-    const { name, tournamentId: bodyTournId } = req.body;
-    if (!name || !bodyTournId)
-      return res.status(400).json({ error: "Name and Tournament ID required" });
+    // Added jerseyColor here
+    const { name, tournamentId: bodyTournId, jerseyColor } = req.body;
 
-    const { error } = await supabase.from("teams").insert({
+    if (!name) return res.status(400).json({ error: "Name required" });
+
+    await supabase.from("teams").insert({
       name,
       tournament_id: bodyTournId,
+      jersey_color: jerseyColor || "#ffffff", // Default white
     });
-
-    if (error) return res.status(500).json({ error: error.message });
     return res.json({ message: "Team added" });
   }
 };

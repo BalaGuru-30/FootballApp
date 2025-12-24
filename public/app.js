@@ -1,102 +1,84 @@
 const API = "/api";
 let token = localStorage.getItem("token");
 let activeTournamentId = null;
+let isAdmin = false;
 
-// --- INIT ---
 function init() {
-  const authSection = document.getElementById("auth-section");
-  const logoutBtn = document.getElementById("logoutBtn");
-  const dashboard = document.getElementById("dashboard-view");
-  const adminTournDiv = document.getElementById("admin-create-tourn");
-
   if (token) {
-    authSection.classList.add("hidden");
-    logoutBtn.classList.remove("hidden");
-    dashboard.classList.remove("hidden");
-
-    // Check Admin
     try {
-      const payload = JSON.parse(atob(token));
-      if (payload.isAdmin) adminTournDiv.classList.remove("hidden");
-    } catch (e) {}
-
-    loadTournaments();
-  } else {
-    authSection.classList.remove("hidden");
-    logoutBtn.classList.add("hidden");
-    dashboard.classList.add("hidden");
+      const p = JSON.parse(atob(token));
+      if (p.isAdmin) {
+        isAdmin = true;
+        document.getElementById("logoutBtn").classList.remove("hidden");
+        document
+          .getElementById("admin-create-tourn")
+          .classList.remove("hidden");
+        document.getElementById("login-modal").classList.add("hidden");
+      }
+    } catch (e) {
+      logout();
+    }
   }
-}
-
-// --- UTILS ---
-function out(msg) {
-  const o = document.getElementById("output");
-  o.textContent = JSON.stringify(msg, null, 2);
-  setTimeout(() => (o.textContent = ""), 3000);
-}
-function getVal(id) {
-  return document.getElementById(id).value;
+  loadTournaments();
 }
 
 // --- AUTH ---
+function toggleLogin() {
+  document.getElementById("login-modal").classList.toggle("hidden");
+}
+
 async function login() {
+  const u = document.getElementById("username").value;
+  const p = document.getElementById("password").value;
   const res = await fetch(`${API}/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      username: getVal("username"),
-      password: getVal("password"),
-    }),
+    body: JSON.stringify({ username: u, password: p }),
   });
   const data = await res.json();
   if (data.token) {
     localStorage.setItem("token", data.token);
     location.reload();
-  } else out(data);
+  } else alert("Login Failed");
 }
-async function signup() {
-  /* Keep existing signup logic */
-  const res = await fetch(`${API}/signup`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      username: getVal("username"),
-      password: getVal("password"),
-    }),
-  });
-  out(await res.json());
-}
+
 function logout() {
   localStorage.removeItem("token");
   location.reload();
 }
 
+async function createAdmin() {
+  const u = document.getElementById("newAdminName").value;
+  const p = document.getElementById("newAdminPass").value;
+  const res = await fetch(`${API}/admins`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ username: u, password: p }),
+  });
+  alert((await res.json()).message || "Done");
+}
+
 // --- TOURNAMENTS ---
 async function loadTournaments() {
-  const res = await fetch(`${API}/tournaments`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const res = await fetch(`${API}/tournaments`);
   const tourns = await res.json();
   const list = document.getElementById("tournament-list");
   list.innerHTML = "";
-
   tourns.forEach((t) => {
     const div = document.createElement("div");
     div.className = "card";
-    div.innerHTML = `<div style="font-weight:bold; font-size:18px;">${
-      t.name
-    }</div><div style="font-size:12px; color:#94a3b8;">Created: ${new Date(
-      t.created_at
-    ).toLocaleDateString()}</div>`;
+    div.style = "cursor:pointer";
+    div.innerHTML = `<h3>${t.name}</h3>`;
     div.onclick = () => openTournament(t.id, t.name);
-    div.style.cursor = "pointer";
     list.appendChild(div);
   });
 }
 
 async function createTournament() {
-  const name = getVal("newTournName");
-  if (!name) return;
+  const name = document.getElementById("newTournName").value;
   await fetch(`${API}/tournaments`, {
     method: "POST",
     headers: {
@@ -108,21 +90,13 @@ async function createTournament() {
   loadTournaments();
 }
 
-// --- ACTIVE TOURNAMENT VIEW ---
 async function openTournament(id, name) {
   activeTournamentId = id;
   document.getElementById("dashboard-view").classList.add("hidden");
   document.getElementById("tournament-view").classList.remove("hidden");
   document.getElementById("active-tourn-title").textContent = name;
-
-  // Show Admin Controls if Admin
-  try {
-    const p = JSON.parse(atob(token));
-    if (p.isAdmin)
-      document
-        .getElementById("admin-tourn-controls")
-        .classList.remove("hidden");
-  } catch (e) {}
+  if (isAdmin)
+    document.getElementById("admin-tourn-controls").classList.remove("hidden");
 
   loadTeams();
   loadMatches();
@@ -134,53 +108,42 @@ function closeTournament() {
   document.getElementById("tournament-view").classList.add("hidden");
 }
 
-// --- TEAMS (Scoped to Tournament) ---
-async function loadTeams() {
-  if (!activeTournamentId) return;
-  const res = await fetch(`${API}/teams?tournamentId=${activeTournamentId}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  const teams = await res.json();
-
-  const list = document.getElementById("teams-list");
-  list.innerHTML = "";
-  teams.forEach((t) => {
-    const div = document.createElement("div");
-    div.style =
-      "background:#1e293b; padding:10px; border-radius:8px; text-align:center; font-weight:bold;";
-    div.textContent = t.name;
-    list.appendChild(div);
-  });
-
-  // Populate Dropdowns
-  const sA = document.getElementById("teamASelect");
-  const sB = document.getElementById("teamBSelect");
-  sA.innerHTML = "<option>Select A</option>";
-  sB.innerHTML = "<option>Select B</option>";
-  teams.forEach((t) => {
-    sA.innerHTML += `<option value="${t.id}">${t.name}</option>`;
-    sB.innerHTML += `<option value="${t.id}">${t.name}</option>`;
-  });
-}
-
+// --- TEAMS ---
 async function addTeam() {
-  const name = prompt("Team Name?");
-  if (!name) return;
+  const name = document.getElementById("newTeamName").value;
+  const color = document.getElementById("newTeamColor").value;
   await fetch(`${API}/teams`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ name, tournamentId: activeTournamentId }),
+    body: JSON.stringify({
+      name,
+      tournamentId: activeTournamentId,
+      jerseyColor: color,
+    }),
   });
   loadTeams();
 }
 
-// --- FIXTURES ---
+async function loadTeams() {
+  const res = await fetch(`${API}/teams?tournamentId=${activeTournamentId}`);
+  const teams = await res.json();
+  const list = document.getElementById("teams-list");
+  list.innerHTML = "";
+  teams.forEach((t) => {
+    list.innerHTML += `
+      <div style="background:#334155; padding:10px; border-radius:6px; display:flex; align-items:center;">
+        <span class="team-dot" style="background:${t.jersey_color}"></span> ${t.name}
+      </div>`;
+  });
+}
+
+// --- MATCHES & SCORING ---
 async function generateFixtures() {
-  if (!confirm("Auto-generate matches for all teams?")) return;
-  const res = await fetch(`${API}/fixtures`, {
+  if (!confirm("Generate?")) return;
+  await fetch(`${API}/fixtures`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -188,59 +151,76 @@ async function generateFixtures() {
     },
     body: JSON.stringify({ tournamentId: activeTournamentId }),
   });
-  out(await res.json());
   loadMatches();
 }
 
-async function scheduleMatch() {
-  const teamAId = getVal("teamASelect");
-  const teamBId = getVal("teamBSelect");
-  const startTime = getVal("matchDate");
+async function updateScore(matchId) {
+  const sA = document.getElementById(`sA-${matchId}`).value;
+  const sB = document.getElementById(`sB-${matchId}`).value;
 
   await fetch(`${API}/matches`, {
-    method: "POST",
+    method: "PUT",
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      teamAId,
-      teamBId,
-      startTime,
-      tournamentId: activeTournamentId,
-    }),
+    body: JSON.stringify({ matchId, scoreA: sA, scoreB: sB }),
   });
   loadMatches();
 }
 
 async function loadMatches() {
-  if (!activeTournamentId) return;
   const res = await fetch(`${API}/matches?tournamentId=${activeTournamentId}`);
   const matches = await res.json();
-
   const list = document.getElementById("matches-list");
   list.innerHTML = "";
+
+  if (matches.length === 0) list.innerHTML = "<p>No matches yet.</p>";
+
   matches.forEach((m) => {
     const div = document.createElement("div");
-    div.className = "card";
+    div.className = "match-card";
+
+    // Scores: If finished/started show score, else show 0-0 or empty
+    const scoreA = m.score_a !== null ? m.score_a : "-";
+    const scoreB = m.score_b !== null ? m.score_b : "-";
+
+    // Logic: If Admin, show inputs. If Public, show text.
+    let scoreDisplay = "";
+    if (isAdmin) {
+      scoreDisplay = `
+        <div style="display:flex; align-items:center; gap:10px; margin-top:10px; justify-content:center;">
+          <input id="sA-${m.id}" type="number" value="${
+        m.score_a || 0
+      }" style="width:50px; text-align:center;">
+          <button onclick="updateScore('${
+            m.id
+          }')" style="width:auto; padding:5px; background:#22c55e;">Save</button>
+          <input id="sB-${m.id}" type="number" value="${
+        m.score_b || 0
+      }" style="width:50px; text-align:center;">
+        </div>
+      `;
+    } else {
+      scoreDisplay = `
+        <div style="display:flex; justify-content:center; font-size:24px; font-weight:bold; margin-top:5px;">
+           ${scoreA} - ${scoreB}
+        </div>
+      `;
+    }
+
     div.innerHTML = `
-      <div style="font-size:12px; color:#94a3b8;">${new Date(
+      <div style="text-align:center; color:#94a3b8; font-size:12px;">${new Date(
         m.start_time
       ).toLocaleString()}</div>
-      <div class="flex-between">
-        <span>${m.team_a_name}</span> 
-        <b style="color:#22c55e;">VS</b> 
-        <span>${m.team_b_name}</span>
+      <div class="flex-between" style="font-size:18px; margin-top:5px;">
+        <span style="width:40%; text-align:left;">${m.team_a_name}</span>
+        <span style="width:40%; text-align:right;">${m.team_b_name}</span>
       </div>
+      ${scoreDisplay}
     `;
     list.appendChild(div);
   });
-}
-
-async function loadPlayers() {
-  const res = await fetch(`${API}/players`);
-  const data = await res.json();
-  out(data);
 }
 
 init();

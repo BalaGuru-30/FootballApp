@@ -3,13 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Football App</title>
+    <title>Weekend League</title>
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
     <div class="app-container">
       <div class="flex-between">
-        <h2>⚽ Manager</h2>
+        <h2>⚽ Weekend League</h2>
         <button
           id="logoutBtn"
           onclick="logout()"
@@ -17,115 +17,125 @@
           style="
             width: auto;
             padding: 5px 10px;
-            font-size: 12px;
             background: #ef4444;
-            color: white;
+            font-size: 12px;
           "
         >
           Log Out
         </button>
       </div>
 
-      <div id="auth-section">
-        <input id="username" placeholder="Username" />
-        <input id="password" type="password" placeholder="Password" />
-        <div class="flex-between">
-          <button class="btn-primary" onclick="login()">Login</button>
-          <div style="width: 10px"></div>
-          <button class="btn-secondary" onclick="signup()">Sign Up</button>
-        </div>
-      </div>
-
-      <div id="dashboard-view" class="hidden">
+      <div id="dashboard-view">
         <h3 style="color: #f59e0b">🏆 Tournaments</h3>
         <div id="tournament-list"></div>
 
-        <div
-          id="admin-create-tourn"
-          class="hidden"
-          style="
-            margin-top: 15px;
-            border-top: 1px dashed #475569;
-            padding-top: 10px;
-          "
-        >
+        <div id="admin-create-tourn" class="hidden box-admin">
+          <h4>Admin Controls</h4>
           <input id="newTournName" placeholder="New Tournament Name..." />
           <button class="btn-admin" onclick="createTournament()">
             + Create Tournament
           </button>
+          <hr style="border-color: #475569" />
+          <input id="newAdminName" placeholder="New Admin Username" />
+          <input
+            id="newAdminPass"
+            type="password"
+            placeholder="New Admin Password"
+          />
+          <button class="btn-admin" onclick="createAdmin()">
+            + Create New Admin
+          </button>
         </div>
-
-        <hr />
-        <button class="btn-secondary" onclick="loadPlayers()">
-          👥 View All Global Players
-        </button>
       </div>
 
       <div id="tournament-view" class="hidden">
         <button
           onclick="closeTournament()"
-          style="
-            background: transparent;
-            color: #94a3b8;
-            text-align: left;
-            padding: 0;
-          "
+          style="background: transparent; color: #94a3b8; padding: 0"
         >
-          ← Back to Dashboard
+          ← Back
         </button>
         <h2
           id="active-tourn-title"
-          style="margin-top: 10px; color: #22c55e"
+          style="margin-top: 5px; color: #22c55e"
         ></h2>
 
-        <h4>Teams</h4>
+        <div id="admin-tourn-controls" class="hidden box-admin">
+          <input id="newTeamName" placeholder="Team Name" />
+          <input
+            id="newTeamColor"
+            type="color"
+            value="#ffffff"
+            style="height: 40px; cursor: pointer"
+          />
+          <button class="btn-admin" onclick="addTeam()">+ Add Team</button>
+          <div style="height: 10px"></div>
+          <button class="btn-primary" onclick="generateFixtures()">
+            🎲 Auto-Fixtures
+          </button>
+        </div>
+
+        <h3>📅 Matches</h3>
+        <div id="matches-list"></div>
+
+        <h4 style="margin-top: 30px; color: #64748b">Participating Teams</h4>
         <div
           id="teams-list"
           style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px"
         ></div>
+      </div>
 
-        <div
-          id="admin-tourn-controls"
-          class="hidden"
-          style="
-            background: #334155;
-            padding: 15px;
-            border-radius: 12px;
-            margin-top: 20px;
-          "
+      <div
+        id="login-modal"
+        class="hidden"
+        style="margin-top: 50px; border-top: 1px solid #333; padding-top: 20px"
+      >
+        <h4>Admin Login</h4>
+        <input id="username" placeholder="Username" />
+        <input id="password" type="password" placeholder="Password" />
+        <button class="btn-primary" onclick="login()">Login</button>
+      </div>
+
+      <div style="text-align: center; margin-top: 50px">
+        <span
+          onclick="toggleLogin()"
+          style="font-size: 12px; color: #334155; cursor: pointer"
+          >Admin Access</span
         >
-          <h4 style="margin-top: 0">⚡ Tournament Admin</h4>
-          <button class="btn-admin" onclick="addTeam()">+ Add Team</button>
-          <button class="btn-primary" onclick="generateFixtures()">
-            🎲 Auto-Generate Fixtures
-          </button>
-
-          <details style="margin-top: 10px">
-            <summary style="cursor: pointer; color: #cbd5e1">
-              Manual Match Create
-            </summary>
-            <select id="teamASelect">
-              <option>Select Team A</option>
-            </select>
-            <select id="teamBSelect">
-              <option>Select Team B</option>
-            </select>
-            <input type="datetime-local" id="matchDate" />
-            <button class="btn-secondary" onclick="scheduleMatch()">
-              Add Single Match
-            </button>
-          </details>
-        </div>
-
-        <hr />
-
-        <h3>📅 Fixtures</h3>
-        <div id="matches-list"></div>
       </div>
 
       <pre id="output"></pre>
     </div>
-
     <script src="app.js"></script>
+    <style>
+      .box-admin {
+        background: #1e293b;
+        padding: 15px;
+        border-radius: 8px;
+        margin-top: 15px;
+        border: 1px dashed #64748b;
+      }
+      .match-card {
+        background: #1e293b;
+        padding: 15px;
+        border-radius: 12px;
+        margin-bottom: 12px;
+        border: 1px solid #334155;
+      }
+      .score-box {
+        font-size: 24px;
+        font-weight: bold;
+        width: 40px;
+        text-align: center;
+      }
+      .team-dot {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 5px;
+        border: 1px solid #fff;
+      }
+    </style>
   </body>
 </html>

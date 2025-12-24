@@ -14,31 +14,25 @@ module.exports = async function handler(req, res) {
   const user = getUser(req);
   const { tournamentId } = req.query;
 
-  // GET: View Matches for specific Tournament
+  // GET: Public View
   if (req.method === "GET") {
     if (!tournamentId) return res.json([]);
-
     const { data, error } = await supabase
       .from("matches")
       .select("*")
       .eq("tournament_id", tournamentId)
       .order("start_time", { ascending: true });
-
     if (error) return res.status(500).json({ error: error.message });
     return res.json(data);
   }
 
-  // POST: Manual Match Creation
+  // POST: Admin Create Match
   if (req.method === "POST") {
     if (!user || !user.isAdmin)
       return res.status(403).json({ error: "Admin only" });
-
     const { teamAId, teamBId, startTime, tournamentId: bodyTournId } = req.body;
 
-    if (!teamAId || !teamBId || !startTime || !bodyTournId) {
-      return res.status(400).json({ error: "Missing fields" });
-    }
-
+    // Fetch names
     const { data: teams } = await supabase
       .from("teams")
       .select("id, name")
@@ -56,6 +50,28 @@ module.exports = async function handler(req, res) {
         team_b_name: teamB.name,
         start_time: startTime,
       })
+      .select()
+      .single();
+
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json(data);
+  }
+
+  // PUT: Admin Update Score
+  if (req.method === "PUT") {
+    if (!user || !user.isAdmin)
+      return res.status(403).json({ error: "Admin only" });
+
+    const { matchId, scoreA, scoreB } = req.body;
+
+    const { data, error } = await supabase
+      .from("matches")
+      .update({
+        score_a: scoreA,
+        score_b: scoreB,
+        status: "finished",
+      })
+      .eq("id", matchId)
       .select()
       .single();
 
