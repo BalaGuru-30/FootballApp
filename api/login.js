@@ -6,30 +6,31 @@ module.exports = async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { username, password } = req.body || {};
+  const { username, password } = req.body;
 
-  if (!username || !password) {
-    return res.status(400).json({ error: "Missing credentials" });
-  }
-
-  const { data: user, error } = await supabase
+  const { data: user } = await supabase
     .from("users")
-    .select("*")
+    .select("id, username, password, is_admin, player_id")
     .eq("username", username)
     .single();
 
-  if (error || !user) {
+  if (!user) {
     return res.status(401).json({ error: "Invalid credentials" });
   }
 
-  const valid = bcrypt.compareSync(password, user.password);
-  if (!valid) {
+  const ok = bcrypt.compareSync(password, user.password);
+  if (!ok) {
     return res.status(401).json({ error: "Invalid credentials" });
   }
 
   const token = Buffer.from(
-    JSON.stringify({ id: user.id, isAdmin: user.is_admin })
+    JSON.stringify({
+      userId: user.id,
+      username: user.username,
+      isAdmin: user.is_admin,
+      playerId: user.player_id,
+    })
   ).toString("base64");
 
-  res.json({ token, isAdmin: user.is_admin });
+  res.json({ token });
 };

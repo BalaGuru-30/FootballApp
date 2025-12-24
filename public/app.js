@@ -1,30 +1,20 @@
 const API = "/api";
 let token = localStorage.getItem("token");
 let user = null;
+let foundPlayer = null;
 
 const loginScreen = document.getElementById("login-screen");
 const dashboard = document.getElementById("dashboard");
+const linkScreen = document.getElementById("link-player-screen");
 
 if (token) {
   user = JSON.parse(atob(token));
   showDashboard();
 }
 
-function showDashboard() {
-  loginScreen.classList.add("hidden");
-  dashboard.classList.remove("hidden");
-
-  if (user?.isAdmin) {
-    const adminBtn = document.createElement("button");
-    adminBtn.innerText = "➕ Create Match";
-    adminBtn.onclick = createMatch;
-    dashboard.prepend(adminBtn);
-  }
-}
-
 async function login() {
-  const username = document.getElementById("username").value;
-  const password = document.getElementById("password").value;
+  const username = usernameInput.value;
+  const password = passwordInput.value;
 
   const res = await fetch(`${API}/login`, {
     method: "POST",
@@ -33,87 +23,66 @@ async function login() {
   });
 
   const data = await res.json();
+  if (!data.token) return alert(data.error);
 
-  if (data.token) {
-    token = data.token;
-    user = JSON.parse(atob(token));
-    localStorage.setItem("token", token);
-    showDashboard();
-  } else {
-    document.getElementById("login-error").innerText = data.error;
-  }
+  token = data.token;
+  user = JSON.parse(atob(token));
+  localStorage.setItem("token", token);
+
+  await checkPlayerLink();
 }
 
-function logout() {
-  localStorage.removeItem("token");
-  location.reload();
+async function signup() {
+  await fetch(`${API}/signup`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      username: usernameInput.value,
+      password: passwordInput.value,
+    }),
+  });
+  login();
 }
 
-async function loadPlayers() {
+async function checkPlayerLink() {
+  if (user.playerId) return showDashboard();
+
   const res = await fetch(`${API}/players`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-
   const players = await res.json();
-  const content = document.getElementById("content");
-  content.innerHTML = "<h3>Players</h3>";
 
-  players.forEach((p) => {
-    content.innerHTML += `<div class="card">${p.name}</div>`;
-  });
+  foundPlayer = players.find((p) => p.name === user.username);
+
+  if (foundPlayer) {
+    loginScreen.classList.add("hidden");
+    linkScreen.classList.remove("hidden");
+    document.getElementById(
+      "player-question"
+    ).innerText = `A player named ${foundPlayer.name} exists. Are you this player?`;
+  } else {
+    showDashboard();
+  }
 }
 
-async function loadMatches() {
-  const res = await fetch(`${API}/matches`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-
-  const matches = await res.json();
-  const content = document.getElementById("content");
-  content.innerHTML = "<h3>Matches</h3>";
-
-  matches.forEach((m) => {
-    content.innerHTML += `
-      <div class="card">
-        <strong>${m.team_a} vs ${m.team_b}</strong>
-        <div class="score">
-          ${m.score_a}
-          ${
-            user?.isAdmin
-              ? `<button onclick="updateScore('${m.id}','A',1)">➕</button>
-          <button onclick="updateScore('${m.id}','A',-1)">➖</button>`
-              : ""
-          }
-          :
-          ${
-            user?.isAdmin
-              ? `<button onclick="updateScore('${m.id}','B',1)">➕</button>
-          <button onclick="updateScore('${m.id}','B',-1)">➖</button>`
-              : ""
-          }
-          ${m.score_b}
-        </div>
-      </div>
-    `;
-  });
-}
-
-async function createMatch() {
-  await fetch(`${API}/matches`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  loadMatches();
-}
-
-async function updateScore(matchId, team, delta) {
-  await fetch(`${API}/score`, {
+async function confirmLink() {
+  await fetch(`${API}/link-player`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ matchId, team, delta }),
+    body: JSON.stringify({ playerId: foundPlayer.id }),
   });
-  loadMatches();
+  showDashboard();
+}
+
+function skipLink() {
+  showDashboard();
+}
+
+function showDashboard() {
+  loginScreen.classList.add("hidden");
+  linkScreen.classList.add("hidden");
+  dashboard.classList.remove("hidden");
 }
