@@ -1,99 +1,327 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Weekend League</title>
-    <link rel="stylesheet" href="style.css" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>League Manager</title>
     <style>
-      /* New UI Polish */
-      .big-btn {
-        display: block;
-        padding: 20px;
-        font-size: 18px;
-        font-weight: bold;
-        text-align: center;
-        background: #1e293b;
-        border: 1px solid #334155;
-        border-radius: 12px;
-        margin-bottom: 15px;
-        cursor: pointer;
-        color: white;
+      :root {
+        --bg: #0f172a;
+        --surface: #1e293b;
+        --surface-light: #334155;
+        --primary: #3b82f6;
+        --success: #22c55e;
+        --danger: #ef4444;
+        --gold: #eab308;
+        --text: #f8fafc;
+        --text-dim: #94a3b8;
       }
-      .big-btn:active {
-        transform: scale(0.98);
-        background: #334155;
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          sans-serif;
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        -webkit-tap-highlight-color: transparent;
+        padding-bottom: 40px;
       }
 
-      .tab-btn {
-        flex: 1;
-        padding: 12px;
-        background: #0f172a;
-        border: 1px solid #334155;
-        color: #94a3b8;
+      /* Layout */
+      .app-container {
+        max-width: 500px;
+        margin: 0 auto;
+        padding: 20px;
+        min-height: 100vh;
+      }
+      .hidden {
+        display: none !important;
+      }
+      .flex-between {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .gap-10 {
+        gap: 10px;
+      }
+
+      /* Components */
+      .card {
+        background: var(--surface);
+        border-radius: 16px;
+        padding: 16px;
+        margin-bottom: 12px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        transition: transform 0.2s;
+      }
+      .card:active {
+        transform: scale(0.99);
+      }
+
+      .btn {
+        border: none;
+        padding: 12px 20px;
+        border-radius: 12px;
         font-weight: 600;
         cursor: pointer;
-        text-align: center;
+        font-size: 14px;
+        transition: opacity 0.2s;
+        width: 100%;
       }
-      .tab-btn.active {
-        background: #3b82f6;
+      .btn:active {
+        opacity: 0.8;
+      }
+      .btn-primary {
+        background: var(--primary);
         color: white;
-        border-color: #3b82f6;
+      }
+      .btn-success {
+        background: var(--success);
+        color: #000;
+      }
+      .btn-danger {
+        background: var(--surface-light);
+        color: var(--danger);
+      }
+      .btn-text {
+        background: transparent;
+        color: var(--text-dim);
+        width: auto;
+        padding: 5px;
+      }
+      .btn-icon {
+        background: transparent;
+        color: var(--text-dim);
+        font-size: 18px;
+        padding: 8px;
+        cursor: pointer;
       }
 
-      .match-row {
+      .input-group {
+        margin-bottom: 15px;
+      }
+      input,
+      select {
+        width: 100%;
+        background: var(--bg);
+        border: 1px solid var(--surface-light);
+        padding: 14px;
+        border-radius: 12px;
+        color: white;
+        font-size: 16px;
+        box-sizing: border-box;
+        outline: none;
+      }
+      input:focus {
+        border-color: var(--primary);
+      }
+
+      /* Search Bar */
+      .search-bar {
+        position: relative;
+        margin-bottom: 20px;
+      }
+      .search-bar input {
+        padding-left: 40px;
+        background: var(--surface);
+        border: none;
+      }
+      .search-icon {
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-dim);
+      }
+
+      /* Tabs */
+      .tabs {
+        display: flex;
+        background: var(--surface);
+        padding: 4px;
+        border-radius: 14px;
+        margin-bottom: 20px;
+      }
+      .tab {
+        flex: 1;
+        text-align: center;
+        padding: 10px;
+        border-radius: 10px;
+        color: var(--text-dim);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .tab.active {
+        background: var(--surface-light);
+        color: white;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      }
+
+      /* Match Card */
+      .match-card {
+        display: flex;
+        flex-direction: column;
+        background: var(--surface);
+        border-radius: 16px;
+        margin-bottom: 12px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+      }
+      .match-card.final-match {
+        border: 1px solid var(--gold);
+        box-shadow: 0 0 10px rgba(234, 179, 8, 0.1);
+      }
+      .match-header {
+        background: rgba(0, 0, 0, 0.2);
+        padding: 8px 16px;
+        font-size: 11px;
+        color: var(--text-dim);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .final-badge {
+        background: var(--gold);
+        color: black;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-weight: bold;
+        font-size: 9px;
+        text-transform: uppercase;
+      }
+      .match-body {
+        padding: 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .team-info {
         display: flex;
         align-items: center;
-        background: #1e293b;
-        margin-bottom: 8px;
-        border-radius: 8px;
-        padding: 10px;
-        border: 1px solid #334155;
+        gap: 8px;
+        width: 40%;
       }
-      .match-finished {
-        border-left: 5px solid #22c55e;
-      } /* Green Highlight */
+      .team-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+      }
+      .score-badge {
+        background: var(--bg);
+        padding: 6px 12px;
+        border-radius: 8px;
+        font-weight: bold;
+        font-family: monospace;
+        font-size: 16px;
+      }
+      .match-controls {
+        display: flex;
+        justify-content: flex-end;
+        padding: 8px;
+        gap: 10px;
+        border-top: 1px solid rgba(255, 255, 255, 0.05);
+      }
 
+      /* Tables */
       table {
         width: 100%;
         border-collapse: collapse;
-        font-size: 14px;
+        font-size: 13px;
       }
       th {
         text-align: left;
-        color: #94a3b8;
-        padding: 5px;
-        border-bottom: 1px solid #334155;
+        color: var(--text-dim);
+        padding: 8px;
+        font-weight: 500;
+        font-size: 11px;
+        text-transform: uppercase;
       }
       td {
-        padding: 8px 5px;
-        border-bottom: 1px solid #1e293b;
+        padding: 12px 8px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      }
+      .pts-cell {
+        font-weight: bold;
+        color: var(--success);
+        text-align: right;
       }
 
-      .control-icon {
-        padding: 5px;
-        cursor: pointer;
-        color: #94a3b8;
-        font-size: 16px;
+      /* Modals */
+      .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        backdrop-filter: blur(4px);
+        z-index: 100;
+        display: flex;
+        align-items: flex-end;
       }
-      .control-icon:hover {
+      .modal-content {
+        background: var(--surface);
+        width: 100%;
+        max-height: 85vh;
+        overflow-y: auto;
+        border-radius: 20px 20px 0 0;
+        padding: 20px;
+        animation: slideUp 0.3s ease;
+      }
+      @keyframes slideUp {
+        from {
+          transform: translateY(100%);
+        }
+        to {
+          transform: translateY(0);
+        }
+      }
+
+      /* Floating Button */
+      .fab {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        width: 50px;
+        height: 50px;
+        border-radius: 25px;
+        background: var(--primary);
         color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 10px rgba(59, 130, 246, 0.4);
+        font-size: 24px;
+        z-index: 50;
+        cursor: pointer;
+      }
+
+      .bg-green {
+        background-color: rgba(34, 197, 94, 0.1);
+        border: 1px solid rgba(34, 197, 94, 0.2);
+      }
+      .text-sm {
+        font-size: 12px;
+        color: var(--text-dim);
       }
     </style>
   </head>
   <body>
     <div class="app-container">
-      <div class="top-bar">
-        <h2 style="margin: 0">⚽ Weekend League</h2>
-        <div id="auth-ui">
-          <span id="loginBtn" onclick="toggleLogin()" class="login-icon"
-            >🔒</span
-          >
+      <div class="flex-between" style="margin-bottom: 20px">
+        <h2 style="margin: 0; font-weight: 800">🏆 LeagueMgr</h2>
+        <div>
+          <span id="loginBtn" onclick="toggleLogin()" class="btn-icon">🔒</span>
           <span
             id="logoutBtn"
             onclick="logout()"
-            class="hidden login-icon"
-            style="color: #ef4444"
+            class="hidden btn-icon"
+            style="color: var(--danger)"
             >🚪</span
           >
         </div>
@@ -103,134 +331,137 @@
         id="login-modal"
         class="hidden"
         style="
-          background: #1e293b;
-          padding: 15px;
           position: absolute;
           top: 60px;
           right: 20px;
-          border-radius: 8px;
-          border: 1px solid #475569;
-          z-index: 50;
+          background: var(--surface);
+          padding: 15px;
+          border-radius: 12px;
+          border: 1px solid var(--surface-light);
+          z-index: 60;
+          width: 200px;
+          box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
         "
       >
-        <input id="uName" placeholder="Username" style="margin-top: 0" />
-        <input id="pWord" type="password" placeholder="Password" />
-        <button class="btn-primary" onclick="login()" style="padding: 8px">
-          Login
+        <input
+          id="uName"
+          placeholder="User"
+          style="margin-bottom: 8px; padding: 10px"
+        />
+        <input
+          id="pWord"
+          type="password"
+          placeholder="Pass"
+          style="margin-bottom: 8px; padding: 10px"
+        />
+        <button class="btn btn-primary" onclick="login()" style="padding: 8px">
+          Sign In
         </button>
       </div>
 
-      <div id="dashboard-view">
-        <div id="players-manager" class="hidden">
-          <button
-            onclick="togglePlayerMgr()"
-            style="
-              background: transparent;
-              color: #94a3b8;
-              padding: 0;
-              margin-bottom: 10px;
-            "
+      <div id="view-dashboard">
+        <div class="tabs">
+          <div class="tab active" onclick="showSection('tournaments', this)">
+            Tournaments
+          </div>
+          <div class="tab" onclick="showSection('players', this)">
+            Global Players
+          </div>
+        </div>
+
+        <div id="section-tournaments">
+          <div class="search-bar">
+            <span class="search-icon">🔍</span>
+            <input
+              type="text"
+              id="searchTourn"
+              placeholder="Search tournaments..."
+              onkeyup="filterTournaments()"
+            />
+          </div>
+          <div class="flex-between" style="margin-bottom: 15px">
+            <input
+              type="date"
+              id="filterDate"
+              onchange="filterTournaments()"
+              style="padding: 10px; font-size: 12px; width: 48%"
+            />
+            <button
+              class="btn-text"
+              onclick="clearFilters()"
+              style="width: 48%; text-align: right; color: var(--primary)"
+            >
+              Clear Filters
+            </button>
+          </div>
+          <div id="tournament-list"></div>
+          <div
+            id="admin-add-tourn-btn"
+            class="fab hidden"
+            onclick="openModal('create-tourn')"
           >
-            ← Back
-          </button>
-          <h3>👥 Manage Players</h3>
-          <div class="flex-between">
+            +
+          </div>
+        </div>
+
+        <div id="section-players" class="hidden">
+          <div
+            id="admin-player-controls"
+            class="hidden input-group flex-between gap-10"
+          >
             <input id="newGlobalPlayer" placeholder="New Player Name" />
             <button
-              class="btn-admin"
+              class="btn btn-primary"
+              style="width: auto"
               onclick="createGlobalPlayer()"
-              style="width: auto; margin-left: 10px"
             >
               Add
             </button>
           </div>
           <div
-            id="all-players-list"
-            style="margin-top: 10px; color: #cbd5e1"
-          ></div>
-        </div>
-
-        <div id="main-menu">
-          <div class="big-btn" onclick="showTournaments()">🏆 Tournaments</div>
-          <div class="big-btn" onclick="togglePlayerMgr()">
-            👥 All Players List
-          </div>
-        </div>
-
-        <div id="tournaments-section" class="hidden">
-          <button
-            onclick="showMainMenu()"
-            style="
-              background: transparent;
-              color: #94a3b8;
-              padding: 0;
-              margin-bottom: 10px;
-            "
+            id="player-error-msg"
+            class="hidden text-sm"
+            style="text-align: center; padding: 20px"
           >
-            ← Back
-          </button>
-          <div class="flex-between">
-            <h3>Tournaments</h3>
-            <button
-              id="createTournBtn"
-              class="btn-admin hidden"
-              onclick="openCreateTournModal()"
-              style="width: auto"
-            >
-              + New
-            </button>
+            Only Admins can manage global players.
           </div>
-          <div id="tournament-list"></div>
+          <div id="all-players-list"></div>
         </div>
       </div>
 
-      <div id="tournament-view" class="hidden">
-        <button
-          onclick="closeTournament()"
-          style="
-            background: transparent;
-            color: #94a3b8;
-            padding: 0;
-            margin-bottom: 10px;
-          "
-        >
-          ← Back to List
-        </button>
-        <h2 id="active-tourn-title" style="color: #22c55e; margin-top: 0"></h2>
+      <div id="view-tournament" class="hidden">
+        <div class="flex-between" style="margin-bottom: 15px">
+          <button class="btn-text" onclick="closeTournament()">← Back</button>
+          <div class="text-sm" style="color: var(--gold)" id="tourn-status">
+            Live
+          </div>
+        </div>
+        <h1
+          id="active-tourn-title"
+          style="font-size: 24px; margin: 0 0 20px 0; font-weight: 700"
+        ></h1>
 
-        <div style="display: flex; margin-bottom: 15px">
-          <div
-            class="tab-btn active"
-            onclick="switchTab('standings')"
-            id="btn-standings"
-          >
-            📊 Table
+        <div class="tabs">
+          <div class="tab active" onclick="switchTab('standings', this)">
+            Standings
           </div>
-          <div
-            class="tab-btn"
-            onclick="switchTab('fixtures')"
-            id="btn-fixtures"
-          >
-            📅 Matches
-          </div>
-          <div class="tab-btn" onclick="switchTab('teams')" id="btn-teams">
-            🛡️ Teams
-          </div>
+          <div class="tab" onclick="switchTab('fixtures', this)">Fixtures</div>
+          <div class="tab" onclick="switchTab('teams', this)">Teams</div>
         </div>
 
         <div id="tab-standings">
-          <div class="card">
+          <div class="card" style="padding: 0; overflow: hidden">
             <table id="league-table">
               <thead>
                 <tr>
-                  <th>Pos</th>
+                  <th style="padding-left: 16px">#</th>
                   <th>Team</th>
                   <th>P</th>
                   <th>W</th>
                   <th>D</th>
                   <th>L</th>
                   <th>GD</th>
-                  <th>Pts</th>
+                  <th style="padding-right: 16px; text-align: right">Pts</th>
                 </tr>
               </thead>
               <tbody id="league-body"></tbody>
@@ -239,116 +470,170 @@
         </div>
 
         <div id="tab-fixtures" class="hidden">
-          <div id="admin-fixtures-controls" class="hidden box-admin">
-            <div class="flex-between">
+          <div id="admin-fixtures-controls" class="hidden card">
+            <div
+              class="text-sm"
+              style="
+                margin-bottom: 10px;
+                font-weight: 600;
+                text-transform: uppercase;
+              "
+            >
+              Fixture Generator
+            </div>
+            <div class="flex-between gap-10">
               <input
                 id="genRounds"
                 type="number"
                 value="1"
                 placeholder="Rounds"
-                style="width: 60px; margin: 0"
+                style="width: 60px"
               />
               <button
                 id="btnGen"
-                class="btn-primary"
+                class="btn btn-primary"
                 onclick="generateFixtures()"
-                style="margin: 0 10px"
               >
-                🎲 Auto-Generate
+                Auto-Schedule
               </button>
               <button
-                class="btn-secondary"
+                class="btn btn-danger"
                 onclick="clearFixtures()"
-                style="background: #ef4444; width: auto"
+                style="width: auto"
               >
-                🗑️ Clear
+                🗑
               </button>
             </div>
             <div
               style="
-                text-align: center;
-                font-size: 11px;
-                color: #94a3b8;
-                margin-top: 5px;
+                border-top: 1px solid rgba(255, 255, 255, 0.1);
+                margin: 15px 0;
+                padding-top: 15px;
               "
             >
-              Enter rounds (1 = Single leg, 2 = Home/Away)
-            </div>
-
-            <hr style="border-color: #475569; margin: 10px 0" />
-
-            <details>
-              <summary style="cursor: pointer; font-size: 12px; color: #cbd5e1">
-                + Add Single Match (Finals/Custom)
-              </summary>
-              <select id="teamASelect">
-                <option>Team A</option>
-              </select>
-              <select id="teamBSelect">
-                <option>Team B</option>
-              </select>
-              <input type="datetime-local" id="matchDate" />
-              <button class="btn-secondary" onclick="scheduleMatch()">
-                Add
+              <div
+                class="text-sm"
+                style="margin-bottom: 10px; font-weight: 600"
+              >
+                Add Single Match
+              </div>
+              <div class="flex-between gap-10" style="margin-bottom: 10px">
+                <select id="teamASelect">
+                  <option value="">Team A</option>
+                </select>
+                <div style="font-size: 12px">VS</div>
+                <select id="teamBSelect">
+                  <option value="">Team B</option>
+                </select>
+              </div>
+              <div class="flex-between gap-10">
+                <select id="matchTypeSelect">
+                  <option value="normal">Normal Match</option>
+                  <option value="final">🏆 Grand Final</option>
+                </select>
+                <input type="datetime-local" id="matchDate" />
+              </div>
+              <button
+                class="btn btn-success"
+                style="margin-top: 10px"
+                onclick="scheduleMatch()"
+              >
+                Add Match
               </button>
-            </details>
+            </div>
           </div>
-
           <div id="matches-list"></div>
         </div>
 
         <div id="tab-teams" class="hidden">
-          <div id="admin-teams-controls" class="hidden box-admin">
-            <h4>Add Team</h4>
-            <input id="newTeamName" placeholder="Team Name" />
-            <input
-              id="newTeamColor"
-              type="color"
-              value="#ffffff"
-              style="height: 40px"
-            />
-            <button class="btn-admin" onclick="addTeam()">+ Add Team</button>
+          <div id="admin-teams-controls" class="hidden card">
+            <div class="text-sm" style="margin-bottom: 10px">Add New Team</div>
+            <div class="flex-between gap-10">
+              <input id="newTeamName" placeholder="Team Name" />
+              <input
+                id="newTeamColor"
+                type="color"
+                value="#3b82f6"
+                style="width: 50px; padding: 5px"
+              />
+              <button
+                class="btn btn-primary"
+                style="width: auto"
+                onclick="addTeam()"
+              >
+                Add
+              </button>
+            </div>
           </div>
           <div id="teams-list"></div>
         </div>
       </div>
 
-      <div id="create-tourn-modal" class="hidden modal">
-        <div class="modal-close" onclick="closeCreateTournModal()">×</div>
-        <div
-          style="
-            background: #1e293b;
-            padding: 20px;
-            border-radius: 12px;
-            margin-top: 100px;
-            border: 1px solid #334155;
-          "
-        >
-          <h3>New Tournament</h3>
-          <input id="newTournName" placeholder="Tournament Name" />
-          <div class="flex-between">
-            <div style="width: 48%">
-              <label>Start</label><input id="newStartDate" type="date" />
+      <div
+        id="modal-create-tourn"
+        class="modal-overlay hidden"
+        onclick="closeModal(event, 'create-tourn')"
+      >
+        <div class="modal-content">
+          <h3 style="margin-top: 0">New Tournament</h3>
+          <div class="input-group">
+            <label class="text-sm">Name</label><input id="newTournName" />
+          </div>
+          <div class="flex-between gap-10">
+            <div class="input-group">
+              <label class="text-sm">Start</label
+              ><input type="date" id="newStartDate" />
             </div>
-            <div style="width: 48%">
-              <label>End</label><input id="newEndDate" type="date" />
+            <div class="input-group">
+              <label class="text-sm">End</label
+              ><input type="date" id="newEndDate" />
             </div>
           </div>
-          <button class="btn-primary" onclick="createTournament()">
+          <button class="btn btn-primary" onclick="createTournament()">
             Create
           </button>
+          <div style="height: 20px"></div>
         </div>
       </div>
 
-      <div id="match-modal" class="hidden modal">
-        <div class="modal-close" onclick="closeMatchModal()">×</div>
-        <div
-          id="match-modal-content"
-          style="background: #1e293b; min-height: 100vh; padding: 20px"
-        ></div>
+      <div
+        id="modal-edit-tourn"
+        class="modal-overlay hidden"
+        onclick="closeModal(event, 'edit-tourn')"
+      >
+        <div class="modal-content">
+          <h3 style="margin-top: 0">Edit Tournament</h3>
+          <input type="hidden" id="editTournId" />
+          <div class="input-group">
+            <label class="text-sm">Name</label><input id="editTournName" />
+          </div>
+          <div class="flex-between gap-10">
+            <div class="input-group">
+              <label class="text-sm">Start</label
+              ><input type="date" id="editStartDate" />
+            </div>
+            <div class="input-group">
+              <label class="text-sm">End</label
+              ><input type="date" id="editEndDate" />
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="updateTournament()">
+            Save
+          </button>
+          <div style="height: 20px"></div>
+        </div>
       </div>
 
-      <pre id="output"></pre>
+      <div
+        id="modal-match"
+        class="modal-overlay hidden"
+        onclick="closeModal(event, 'match')"
+      >
+        <div class="modal-content">
+          <div id="match-modal-content"></div>
+          <div style="height: 20px"></div>
+        </div>
+      </div>
     </div>
     <script src="app.js"></script>
   </body>

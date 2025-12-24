@@ -18,47 +18,65 @@ module.exports = async function handler(req, res) {
 
   const { tournamentId, action, rounds } = req.body;
 
-  // 1. CLEAR FIXTURES
   if (action === "clear") {
-    const { error } = await supabase
-      .from("matches")
-      .delete()
-      .eq("tournament_id", tournamentId);
-    if (error) return res.status(500).json({ error: error.message });
+    await supabase.from("matches").delete().eq("tournament_id", tournamentId);
     return res.json({ message: "Fixtures Cleared" });
   }
 
-  // 2. GENERATE FIXTURES
+  // 1. Get Teams
   const { data: teams } = await supabase
     .from("teams")
     .select("*")
     .eq("tournament_id", tournamentId);
   if (teams.length < 2) return res.status(400).json({ error: "Need 2+ teams" });
 
-  const matches = [];
-  const loopCount = rounds || 1; // Default 1 round
+  let schedule = [];
+  const teamIds = teams.map((t) => t.id);
 
-  for (let r = 0; r < loopCount; r++) {
-    for (let i = 0; i < teams.length; i++) {
-      for (let j = i + 1; j < teams.length; j++) {
-        // Swap Home/Away every round to balance it
-        const tA = r % 2 === 0 ? teams[i] : teams[j];
-        const tB = r % 2 === 0 ? teams[j] : teams[i];
+  // Add "Dummy" team if odd number (Standard scheduling trick)
+  if (teamIds.length % 2 !== 0) {
+    teamIds.push(null);
+  }
 
-        matches.push({
-          tournament_id: tournamentId,
-          team_a_id: tA.id,
-          team_b_id: tB.id,
-          team_a_name: tA.name,
-          team_b_name: tB.name,
-          start_time: new Date().toISOString(), // Admin will edit dates later
-          match_order: matches.length + 1, // Simple ordering
-        });
+  const numTeams = teamIds.length;
+  const matchesPerRound = numTeams / 2;
+  const totalRounds = numTeams - 1;
+  const loopCount = rounds || 1;
+
+  // 2. Generate Rounds (Circle Method Algorithm)
+  for (let loop = 0; loop < loopCount; loop++) {
+    for (let round = 0; round < totalRounds; round++) {
+      for (let match = 0; match < matchesPerRound; match++) {
+        const home = teamIds[match];
+        const away = teamIds[numTeams - 1 - match];
+
+        if (home && away) {
+          // Don't schedule dummy matches
+          // Swap home/away every loop to balance home/away games
+          const realHomeId = loop % 2 === 0 ? home : away;
+          const realAwayId = loop % 2 === 0 ? away : home;
+
+          const teamA = teams.find((t) => t.id === realHomeId);
+          const teamB = teams.find((t) => t.id === realAwayId);
+
+          schedule.push({
+            tournament_id: tournamentId,
+            team_a_id: teamA.id,
+            team_b_id: teamB.id,
+            team_a_name: teamA.name,
+            team_b_name: teamB.name,
+            start_time: new Date().toISOString(),
+            match_order: schedule.length + 1,
+            match_type: "normal",
+          });
+        }
       }
+      // Rotate the array (keep index 0 fixed, rotate the rest)
+      teamIds.splice(1, 0, teamIds.pop());
     }
   }
 
-  const { error } = await supabase.from("matches").insert(matches);
+  const { error } = await supabase.from("matches").insert(schedule);
   if (error) return res.status(500).json({ error: error.message });
-  return res.json({ message: `Generated ${matches.length} matches!` });
+  return res.json({ message: `Generated ${schedule.length} matches!` });
 };

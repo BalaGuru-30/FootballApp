@@ -14,7 +14,7 @@ module.exports = async function handler(req, res) {
   const user = getUser(req);
   const { tournamentId } = req.query;
 
-  // GET: Sorted by Order
+  // GET: Sorted by custom order, then time
   if (req.method === "GET") {
     if (!tournamentId) return res.json([]);
     const { data, error } = await supabase
@@ -27,11 +27,22 @@ module.exports = async function handler(req, res) {
     return res.json(data);
   }
 
-  // POST: Create
+  // ADMIN ONLY
+  if (!user || !user.isAdmin)
+    return res.status(403).json({ error: "Admin only" });
+
+  // POST: Create Match
   if (req.method === "POST") {
-    if (!user || !user.isAdmin)
-      return res.status(403).json({ error: "Admin only" });
-    const { teamAId, teamBId, startTime, tournamentId: bodyTournId } = req.body;
+    const {
+      teamAId,
+      teamBId,
+      startTime,
+      tournamentId: bodyTournId,
+      matchType,
+    } = req.body;
+
+    if (!teamAId || !teamBId)
+      return res.status(400).json({ error: "Select teams" });
 
     // Fetch names
     const { data: teams } = await supabase
@@ -41,7 +52,7 @@ module.exports = async function handler(req, res) {
     const teamA = teams.find((t) => t.id === teamAId);
     const teamB = teams.find((t) => t.id === teamBId);
 
-    // Get max order to put at bottom
+    // Get max order
     const { data: max } = await supabase
       .from("matches")
       .select("match_order")
@@ -61,17 +72,17 @@ module.exports = async function handler(req, res) {
         team_b_name: teamB.name,
         start_time: startTime,
         match_order: newOrder,
+        match_type: matchType || "normal", // Save match type
       })
       .select()
       .single();
+
     if (error) return res.status(500).json({ error: error.message });
     return res.json(data);
   }
 
   // PUT: Update Score OR Reorder
   if (req.method === "PUT") {
-    if (!user || !user.isAdmin)
-      return res.status(403).json({ error: "Admin only" });
     const { matchId, scoreA, scoreB, newOrder } = req.body;
 
     let updateData = {};
@@ -90,8 +101,6 @@ module.exports = async function handler(req, res) {
 
   // DELETE: Remove Match
   if (req.method === "DELETE") {
-    if (!user || !user.isAdmin)
-      return res.status(403).json({ error: "Admin only" });
     const { id } = req.body;
     const { error } = await supabase.from("matches").delete().eq("id", id);
     if (error) return res.status(500).json({ error: error.message });

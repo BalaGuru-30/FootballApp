@@ -13,21 +13,20 @@ function getUser(req) {
 module.exports = async function handler(req, res) {
   const user = getUser(req);
 
-  // GET: All Global Players
+  // GET: Public - List all players
   if (req.method === "GET") {
     const { data } = await supabase.from("players").select("*").order("name");
     return res.json(data);
   }
 
-  // POST: Create Global Player
-  if (req.method === "POST") {
-    if (!user || !user.isAdmin)
-      return res.status(403).json({ error: "Admin only" });
+  // ALL OTHER METHODS: ADMIN ONLY
+  if (!user || !user.isAdmin)
+    return res.status(403).json({ error: "Admin only" });
 
+  // POST: Create Player
+  if (req.method === "POST") {
     const { name } = req.body;
     if (!name) return res.status(400).json({ error: "Name required" });
-
-    // Return the created player so we can use ID immediately
     const { data, error } = await supabase
       .from("players")
       .insert({ name })
@@ -35,5 +34,13 @@ module.exports = async function handler(req, res) {
       .single();
     if (error) return res.status(500).json({ error: error.message });
     return res.json(data);
+  }
+
+  // DELETE: Remove Player
+  if (req.method === "DELETE") {
+    const { id } = req.body;
+    const { error } = await supabase.from("players").delete().eq("id", id);
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json({ message: "Deleted" });
   }
 };
