@@ -7,7 +7,8 @@ let allTournaments = [];
 let currentTeams = [];
 let currentMatches = [];
 let activeTab = "standings";
-let currentFilterTeamId = "all"; // STORE FILTER STATE
+let currentFilterTeamId = "all";
+let sortableInstance = null; // Store Sortable instance
 
 function init() {
   if (token) {
@@ -28,14 +29,60 @@ function init() {
   }
   loadTournaments();
 
-  // REAL-TIME POLLING
+  // Real-time polling
   setInterval(() => {
-    if (activeTournamentId && !document.hidden) {
+    if (
+      activeTournamentId &&
+      !document.hidden &&
+      !sortableInstance?.option("disabled")
+    ) {
+      // Don't refresh while dragging
       if (activeTab === "fixtures") loadMatches(true);
       if (activeTab === "teams") loadTeams(true);
       if (activeTab === "standings") loadMatches(true);
     }
   }, 3000);
+}
+
+// --- SORTABLE JS INIT ---
+function initSortable() {
+  const el = document.getElementById("matches-list");
+  if (sortableInstance) sortableInstance.destroy();
+
+  if (isAdmin && currentFilterTeamId === "all") {
+    sortableInstance = new Sortable(el, {
+      handle: ".drag-handle",
+      animation: 150,
+      filter: ".final-match", // Finals cannot be dragged
+      onEnd: async function (evt) {
+        // Logic to calculate new order
+        const item = evt.item;
+        const prevItem = item.previousElementSibling;
+        const nextItem = item.nextElementSibling;
+
+        const prevOrder = prevItem ? parseFloat(prevItem.dataset.order) : 0;
+        // If no next item, add 1. If next item exists, split the difference.
+        const nextOrder = nextItem
+          ? parseFloat(nextItem.dataset.order)
+          : prevOrder + 2;
+
+        const newOrder = (prevOrder + nextOrder) / 2;
+        const matchId = item.dataset.id;
+
+        // Update Local Data immediately to prevent jump
+        item.dataset.order = newOrder;
+
+        await fetch(`${API}/matches`, {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ matchId: matchId, newOrder: newOrder }),
+        });
+      },
+    });
+  }
 }
 
 // --- UI HELPERS ---
@@ -252,6 +299,7 @@ function closeTournament() {
   activeTournamentId = null;
   document.getElementById("view-dashboard").classList.remove("hidden");
   document.getElementById("view-tournament").classList.add("hidden");
+  if (sortableInstance) sortableInstance.destroy();
 }
 
 function switchTab(tab, el) {
@@ -274,7 +322,6 @@ async function loadTeams(silent = false) {
 
   if (!silent) list.innerHTML = "";
 
-  // Update Dropdowns for Match Creation & Filtering
   const sA = document.getElementById("teamASelect");
   const sB = document.getElementById("teamBSelect");
   const filterSel = document.getElementById("fixtureFilter");
@@ -283,7 +330,6 @@ async function loadTeams(silent = false) {
     const allOpt = "<option value='all'>Show All Teams</option>";
     sA.innerHTML = "<option value=''>Team A</option>";
     sB.innerHTML = "<option value=''>Team B</option>";
-    // Only rebuild filter if not open (prevents reset while using)
     if (document.activeElement !== filterSel) filterSel.innerHTML = allOpt;
 
     currentTeams.forEach((t) => {
@@ -292,7 +338,6 @@ async function loadTeams(silent = false) {
       sB.innerHTML += opt;
       if (document.activeElement !== filterSel) filterSel.innerHTML += opt;
     });
-    // Restore filter value
     filterSel.value = currentFilterTeamId;
   }
 
@@ -434,6 +479,11 @@ async function linkPlayer(teamId, playerId) {
 function applyFixtureFilter() {
   currentFilterTeamId = document.getElementById("fixtureFilter").value;
   renderMatchList(document.getElementById("matches-list"));
+
+  // Disable drag if filtered
+  if (sortableInstance) {
+    sortableInstance.option("disabled", currentFilterTeamId !== "all");
+  }
 }
 
 async function generateFixtures() {
@@ -491,7 +541,7 @@ async function loadMatches(silent = false) {
   const res = await fetch(`${API}/matches?tournamentId=${activeTournamentId}`);
   currentMatches = await res.json();
 
-  // SORT
+  // SORT: Finals first, then by Order
   currentMatches.sort((a, b) => {
     if (a.match_type === "final" && b.match_type !== "final") return -1;
     if (a.match_type !== "final" && b.match_type === "final") return 1;
@@ -499,11 +549,17 @@ async function loadMatches(silent = false) {
   });
 
   if (!silent) renderMatchList(document.getElementById("matches-list"));
-  else if (document.activeElement.tagName !== "INPUT")
+  else if (
+    document.activeElement.tagName !== "INPUT" &&
+    !sortableInstance?.option("disabled")
+  )
     renderMatchList(document.getElementById("matches-list"));
 
   if (isAdmin)
     document.getElementById("matchDate").value = activeTournamentDate;
+
+  // Re-init sortable after render
+  if (!silent) initSortable();
 }
 
 function renderMatchList(container) {
@@ -518,7 +574,6 @@ function renderMatchList(container) {
   }
 
   currentMatches.forEach((m) => {
-    // FILTER LOGIC
     if (currentFilterTeamId !== "all") {
       if (
         m.team_a_id !== currentFilterTeamId &&
@@ -536,30 +591,23 @@ function renderMatchList(container) {
       m.status === "finished" ? `${m.score_a} - ${m.score_b}` : "VS";
     const scoreClass = m.status === "finished" ? "bg-green" : "";
 
-    let reorderUI = isAdmin
-      ? `
-       <div class="reorder-controls">
-         <div class="reorder-btn" onclick="moveMatch(event, '${m.id}', ${m.match_order}, -1)">▲</div>
-         <div class="reorder-btn" onclick="moveMatch(event, '${m.id}', ${m.match_order}, 1)">▼</div>
-       </div>`
-      : "";
     let delBtn = isAdmin
-      ? `<span style="color:var(--danger); cursor:pointer;" onclick="deleteMatch(event, '${m.id}')">🗑</span>`
+      ? `<span style="color:var(--danger); cursor:pointer;" class="delete-btn" onclick="deleteMatch(event, '${m.id}')">🗑</span>`
       : "";
+    let dragHandle =
+      isAdmin && !isFinal ? `<div class="drag-handle"></div>` : "";
 
     const div = document.createElement("div");
     div.className = `match-card ${isFinal ? "final-match" : ""}`;
-    div.style.flexDirection = "row";
+    div.dataset.id = m.id;
+    div.dataset.order = m.match_order;
+
     div.onclick = (e) => {
-      if (
-        !e.target.closest(".reorder-controls") &&
-        !e.target.closest(".delete-btn")
-      )
-        openMatchModal(m, tA, tB);
+      if (!e.target.closest(".delete-btn")) openMatchModal(m, tA, tB);
     };
 
     div.innerHTML = `
-       <div style="flex:1;">
+       <div class="match-content">
          <div class="match-header"><span>${
            isFinal ? "🏆 GRAND FINAL" : "Match " + Math.round(m.match_order)
          }</span> ${delBtn}</div>
@@ -573,26 +621,13 @@ function renderMatchList(container) {
            }</span><div style="width:10px; height:10px; border-radius:50%; background:${cB}; box-shadow:0 0 5px ${cB};"></div></div>
          </div>
        </div>
-       ${reorderUI}
+       ${dragHandle}
      `;
     container.appendChild(div);
   });
   calcStandings();
 }
 
-async function moveMatch(e, id, order, dir) {
-  e.stopPropagation();
-  const newOrder = order + dir * 1.5;
-  await fetch(`${API}/matches`, {
-    method: "PUT",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ matchId: id, newOrder }),
-  });
-  loadMatches();
-}
 async function deleteMatch(e, id) {
   e.stopPropagation();
   if (!confirm("Delete?")) return;
