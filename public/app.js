@@ -7,6 +7,9 @@ const loginScreen = document.getElementById("login-screen");
 const dashboard = document.getElementById("dashboard");
 const linkScreen = document.getElementById("link-player-screen");
 
+const usernameInput = document.getElementById("username");
+const passwordInput = document.getElementById("password");
+
 if (token) {
   user = JSON.parse(atob(token));
   showDashboard();
