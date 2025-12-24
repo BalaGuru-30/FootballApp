@@ -1,13 +1,16 @@
-import { supabase } from "./_supabase";
+const { supabase } = require("./_supabase");
 
-function getUserFromToken(req) {
-  const auth = req.headers.authorization;
-  if (!auth) return null;
-  return JSON.parse(Buffer.from(auth.split(" ")[1], "base64").toString());
+function getUser(req) {
+  try {
+    const auth = req.headers.authorization;
+    return JSON.parse(Buffer.from(auth.split(" ")[1], "base64").toString());
+  } catch {
+    return null;
+  }
 }
 
-export default async function handler(req, res) {
-  const user = getUserFromToken(req);
+module.exports = async function handler(req, res) {
+  const user = getUser(req);
   if (!user) return res.status(401).json({ error: "Unauthorized" });
 
   if (req.method === "GET") {
@@ -32,4 +35,4 @@ export default async function handler(req, res) {
   }
 
   res.status(405).end();
-}
+};
