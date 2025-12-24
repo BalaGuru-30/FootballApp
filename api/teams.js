@@ -2,9 +2,9 @@ const { supabase } = require("./_supabase");
 
 function getUser(req) {
   try {
-    const auth = req.headers.authorization;
-    if (!auth) return null;
-    return JSON.parse(Buffer.from(auth.split(" ")[1], "base64").toString());
+    return JSON.parse(
+      Buffer.from(req.headers.authorization.split(" ")[1], "base64").toString()
+    );
   } catch {
     return null;
   }
@@ -12,31 +12,58 @@ function getUser(req) {
 
 module.exports = async function handler(req, res) {
   const user = getUser(req);
-  const { tournamentId } = req.query;
+  const { tournamentId, includePlayers } = req.query;
 
+  // GET: List Teams (Optional: Include Roster)
   if (req.method === "GET") {
-    if (!tournamentId) return res.json([]);
-    const { data } = await supabase
+    let query = supabase
       .from("teams")
-      .select("*")
+      .select("*, team_players(players(*))")
       .eq("tournament_id", tournamentId);
+    const { data, error } = await query;
+    if (error) return res.status(500).json({ error: error.message });
     return res.json(data);
   }
 
+  // AUTH CHECK
+  if (!user || !user.isAdmin)
+    return res.status(403).json({ error: "Admin only" });
+
+  // POST: Create Team
   if (req.method === "POST") {
-    if (!user || !user.isAdmin)
-      return res.status(403).json({ error: "Admin only" });
+    const { name, tournamentId: tid, jerseyColor } = req.body;
+    const { error } = await supabase
+      .from("teams")
+      .insert({
+        name,
+        tournament_id: tid,
+        jersey_color: jerseyColor || "#ffffff",
+      });
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json({ message: "Team created" });
+  }
 
-    // Added jerseyColor here
-    const { name, tournamentId: bodyTournId, jerseyColor } = req.body;
+  // PUT: Edit Team / Add Player
+  if (req.method === "PUT") {
+    const { action, teamId, name, playerId } = req.body;
 
-    if (!name) return res.status(400).json({ error: "Name required" });
+    // 1. Rename Team
+    if (action === "rename") {
+      const { error } = await supabase
+        .from("teams")
+        .update({ name })
+        .eq("id", teamId);
+      if (error) return res.status(500).json({ error: error.message });
+      return res.json({ message: "Renamed" });
+    }
 
-    await supabase.from("teams").insert({
-      name,
-      tournament_id: bodyTournId,
-      jersey_color: jerseyColor || "#ffffff", // Default white
-    });
-    return res.json({ message: "Team added" });
+    // 2. Add Player to Team
+    if (action === "add_player") {
+      const { error } = await supabase
+        .from("team_players")
+        .insert({ team_id: teamId, player_id: playerId });
+      if (error) return res.status(500).json({ error: error.message });
+      return res.json({ message: "Player added" });
+    }
   }
 };
