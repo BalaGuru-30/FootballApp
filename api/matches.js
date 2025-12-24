@@ -1,12 +1,10 @@
 const { supabase } = require("./_supabase");
 
-// Helper: Safe User Extraction
 function getUser(req) {
   try {
     const auth = req.headers.authorization;
     if (!auth) return null;
-    const token = auth.split(" ")[1];
-    return JSON.parse(Buffer.from(token, "base64").toString());
+    return JSON.parse(Buffer.from(auth.split(" ")[1], "base64").toString());
   } catch {
     return null;
   }
@@ -14,48 +12,44 @@ function getUser(req) {
 
 module.exports = async function handler(req, res) {
   const user = getUser(req);
+  const { tournamentId } = req.query;
 
-  // GET: Public - View All Matches
+  // GET: View Matches for specific Tournament
   if (req.method === "GET") {
+    if (!tournamentId) return res.json([]);
+
     const { data, error } = await supabase
       .from("matches")
       .select("*")
+      .eq("tournament_id", tournamentId)
       .order("start_time", { ascending: true });
 
     if (error) return res.status(500).json({ error: error.message });
     return res.json(data);
   }
 
-  // POST: Admin Only - Schedule Match
+  // POST: Manual Match Creation
   if (req.method === "POST") {
     if (!user || !user.isAdmin)
       return res.status(403).json({ error: "Admin only" });
 
-    const { teamAId, teamBId, startTime } = req.body;
+    const { teamAId, teamBId, startTime, tournamentId: bodyTournId } = req.body;
 
-    if (!teamAId || !teamBId || !startTime) {
+    if (!teamAId || !teamBId || !startTime || !bodyTournId) {
       return res.status(400).json({ error: "Missing fields" });
     }
-    if (teamAId === teamBId) {
-      return res.status(400).json({ error: "Cannot play against self" });
-    }
 
-    // 1. Fetch team names first (for display efficiency)
     const { data: teams } = await supabase
       .from("teams")
       .select("id, name")
       .in("id", [teamAId, teamBId]);
-
     const teamA = teams.find((t) => t.id === teamAId);
     const teamB = teams.find((t) => t.id === teamBId);
 
-    if (!teamA || !teamB)
-      return res.status(400).json({ error: "Teams not found" });
-
-    // 2. Insert Match
     const { data, error } = await supabase
       .from("matches")
       .insert({
+        tournament_id: bodyTournId,
         team_a_id: teamAId,
         team_b_id: teamBId,
         team_a_name: teamA.name,
@@ -68,6 +62,4 @@ module.exports = async function handler(req, res) {
     if (error) return res.status(500).json({ error: error.message });
     return res.json(data);
   }
-
-  return res.status(405).json({ error: "Method not allowed" });
 };

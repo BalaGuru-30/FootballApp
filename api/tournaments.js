@@ -12,34 +12,30 @@ function getUser(req) {
 
 module.exports = async function handler(req, res) {
   const user = getUser(req);
-  const { tournamentId } = req.query; // Get ID from URL query ?tournamentId=...
 
+  // GET: List all tournaments
   if (req.method === "GET") {
-    if (!tournamentId) return res.json([]); // Don't return anything if no tournament selected
-
     const { data, error } = await supabase
-      .from("teams")
+      .from("tournaments")
       .select("*")
-      .eq("tournament_id", tournamentId);
-
+      .order("created_at", { ascending: false });
     if (error) return res.status(500).json({ error: error.message });
     return res.json(data);
   }
 
+  // POST: Create Tournament (Admin)
   if (req.method === "POST") {
     if (!user || !user.isAdmin)
       return res.status(403).json({ error: "Admin only" });
+    const { name } = req.body;
+    if (!name) return res.status(400).json({ error: "Name required" });
 
-    const { name, tournamentId: bodyTournId } = req.body;
-    if (!name || !bodyTournId)
-      return res.status(400).json({ error: "Name and Tournament ID required" });
-
-    const { error } = await supabase.from("teams").insert({
-      name,
-      tournament_id: bodyTournId,
-    });
-
+    const { data, error } = await supabase
+      .from("tournaments")
+      .insert({ name })
+      .select()
+      .single();
     if (error) return res.status(500).json({ error: error.message });
-    return res.json({ message: "Team added" });
+    return res.json(data);
   }
 };

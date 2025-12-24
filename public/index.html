@@ -36,102 +36,92 @@
         </div>
       </div>
 
-      <div
-        style="
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 10px;
-          margin-top: 20px;
-        "
-      >
-        <button class="btn-secondary" onclick="loadPlayers()">
-          👥 Players
-        </button>
-        <button class="btn-secondary" onclick="loadTeams()">🛡️ Teams</button>
-      </div>
-
-      <div
-        id="link-section"
-        class="hidden card"
-        style="margin-top: 20px; border: 1px solid #3b82f6"
-      >
-        <h4 style="margin-top: 0; color: #3b82f6">🔗 Link Your Profile</h4>
-        <p style="font-size: 13px; color: #cbd5e1">
-          Are you one of these players? Claim your profile.
-        </p>
-        <select id="linkPlayerSelect">
-          <option>Select Yourself...</option>
-        </select>
-        <button class="btn-primary" onclick="requestLink()">That's Me!</button>
-      </div>
-
-      <div
-        id="admin-controls"
-        class="hidden"
-        style="
-          margin-top: 20px;
-          border-top: 1px dashed #475569;
-          padding-top: 20px;
-        "
-      >
-        <h4 style="color: #f59e0b">⚡ Admin Controls</h4>
+      <div id="dashboard-view" class="hidden">
+        <h3 style="color: #f59e0b">🏆 Tournaments</h3>
+        <div id="tournament-list"></div>
 
         <div
-          id="approval-box"
-          class="card hidden"
-          style="border: 1px solid #f59e0b"
+          id="admin-create-tourn"
+          class="hidden"
+          style="
+            margin-top: 15px;
+            border-top: 1px dashed #475569;
+            padding-top: 10px;
+          "
         >
-          <h4 style="margin: 0">🔔 Pending Approvals</h4>
-          <div id="approval-list"></div>
+          <input id="newTournName" placeholder="New Tournament Name..." />
+          <button class="btn-admin" onclick="createTournament()">
+            + Create Tournament
+          </button>
         </div>
 
-        <button class="btn-admin" onclick="addPlayer()">+ Add Player</button>
-        <button class="btn-admin" onclick="addTeam()">+ Add Team</button>
+        <hr />
+        <button class="btn-secondary" onclick="loadPlayers()">
+          👥 View All Global Players
+        </button>
+      </div>
+
+      <div id="tournament-view" class="hidden">
+        <button
+          onclick="closeTournament()"
+          style="
+            background: transparent;
+            color: #94a3b8;
+            text-align: left;
+            padding: 0;
+          "
+        >
+          ← Back to Dashboard
+        </button>
+        <h2
+          id="active-tourn-title"
+          style="margin-top: 10px; color: #22c55e"
+        ></h2>
+
+        <h4>Teams</h4>
+        <div
+          id="teams-list"
+          style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px"
+        ></div>
 
         <div
+          id="admin-tourn-controls"
+          class="hidden"
           style="
             background: #334155;
             padding: 15px;
-            border-radius: 8px;
-            margin-top: 10px;
+            border-radius: 12px;
+            margin-top: 20px;
           "
         >
-          <h4 style="margin: 0 0 10px 0">Schedule Match</h4>
-          <select id="teamASelect">
-            <option>Select Team A</option>
-          </select>
-          <div
-            style="
-              text-align: center;
-              color: #94a3b8;
-              font-size: 12px;
-              margin: 5px;
-            "
-          >
-            VS
-          </div>
-          <select id="teamBSelect">
-            <option>Select Team B</option>
-          </select>
-          <input type="datetime-local" id="matchDate" />
-          <button class="btn-primary" onclick="scheduleMatch()">
-            Create Match
+          <h4 style="margin-top: 0">⚡ Tournament Admin</h4>
+          <button class="btn-admin" onclick="addTeam()">+ Add Team</button>
+          <button class="btn-primary" onclick="generateFixtures()">
+            🎲 Auto-Generate Fixtures
           </button>
+
+          <details style="margin-top: 10px">
+            <summary style="cursor: pointer; color: #cbd5e1">
+              Manual Match Create
+            </summary>
+            <select id="teamASelect">
+              <option>Select Team A</option>
+            </select>
+            <select id="teamBSelect">
+              <option>Select Team B</option>
+            </select>
+            <input type="datetime-local" id="matchDate" />
+            <button class="btn-secondary" onclick="scheduleMatch()">
+              Add Single Match
+            </button>
+          </details>
         </div>
-      </div>
 
-      <hr />
+        <hr />
 
-      <div class="flex-between">
-        <h3>📅 Matches</h3>
-        <button
-          onclick="loadMatches()"
-          style="width: auto; padding: 8px; background: none; color: #3b82f6"
-        >
-          🔄
-        </button>
+        <h3>📅 Fixtures</h3>
+        <div id="matches-list"></div>
       </div>
-      <div id="matches-list"></div>
 
       <pre id="output"></pre>
     </div>
