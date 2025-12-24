@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Football App</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <!-- LOGIN -->
+    <div id="login-screen" class="screen">
+      <h1>⚽ Football App</h1>
+      <input id="username" placeholder="Username" />
+      <input id="password" type="password" placeholder="Password" />
+      <button onclick="login()">Login</button>
+      <p id="login-error"></p>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div id="dashboard" class="screen hidden">
+      <h2>Dashboard</h2>
+      <button onclick="loadPlayers()">👥 Players</button>
+      <button onclick="loadMatches()">⚽ Matches</button>
+      <button onclick="logout()">Logout</button>
+
+      <div id="content"></div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
