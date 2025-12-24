@@ -14,6 +14,7 @@ module.exports = async function handler(req, res) {
   const user = getUser(req);
   const { tournamentId } = req.query;
 
+  // GET
   if (req.method === "GET") {
     let query = supabase
       .from("teams")
@@ -25,9 +26,11 @@ module.exports = async function handler(req, res) {
     return res.json(data);
   }
 
+  // ADMIN ONLY
   if (!user || !user.isAdmin)
     return res.status(403).json({ error: "Admin only" });
 
+  // POST
   if (req.method === "POST") {
     const { name, tournamentId: tid, jerseyColor } = req.body;
     const { error } = await supabase
@@ -41,16 +44,18 @@ module.exports = async function handler(req, res) {
     return res.json({ message: "Team created" });
   }
 
+  // PUT: Rename, Edit Color, Add Player
   if (req.method === "PUT") {
-    const { action, teamId, name, playerId } = req.body;
+    const { action, teamId, name, jerseyColor, playerId } = req.body;
 
-    if (action === "rename") {
+    // NEW: Edit (Name + Color)
+    if (action === "edit") {
       const { error } = await supabase
         .from("teams")
-        .update({ name })
+        .update({ name, jersey_color: jerseyColor })
         .eq("id", teamId);
       if (error) return res.status(500).json({ error: error.message });
-      return res.json({ message: "Renamed" });
+      return res.json({ message: "Team updated" });
     }
 
     if (action === "add_player") {
@@ -62,7 +67,7 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  // NEW: Delete Team
+  // DELETE
   if (req.method === "DELETE") {
     const { id } = req.body;
     const { error } = await supabase.from("teams").delete().eq("id", id);

@@ -5,6 +5,8 @@ let activeTournamentId = null;
 let activeTournamentDate = null;
 let allTournaments = [];
 let currentTeams = [];
+let currentMatches = [];
+let activeTab = "standings"; // Track active tab for auto-refresh
 
 function init() {
   if (token) {
@@ -24,9 +26,25 @@ function init() {
     }
   }
   loadTournaments();
+
+  // REAL-TIME AUTO REFRESH (Every 3 seconds)
+  setInterval(() => {
+    if (activeTournamentId && !document.hidden) {
+      if (activeTab === "fixtures") loadMatches(true); // true = silent refresh
+      if (activeTab === "teams") loadTeams(true);
+      if (activeTab === "standings") loadMatches(true); // Matches update standings
+    }
+  }, 3000);
 }
 
 // --- UI HELPERS ---
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg || "✅ Success";
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 2000);
+}
+
 function showSection(id, tabEl) {
   document.getElementById("section-tournaments").classList.add("hidden");
   document.getElementById("section-players").classList.add("hidden");
@@ -186,7 +204,7 @@ async function loadAllPlayers() {
       : "";
     list.innerHTML += `<div class="card" style="padding:10px; display:flex; justify-content:space-between;"><span>${p.name}</span>${delBtn}</div>`;
   });
-  return players; // Return for picker
+  return players;
 }
 async function createGlobalPlayer() {
   const name = document.getElementById("newGlobalPlayer").value;
@@ -239,6 +257,7 @@ function closeTournament() {
 }
 
 function switchTab(tab, el) {
+  activeTab = tab;
   document
     .querySelectorAll("#view-tournament .tab")
     .forEach((t) => t.classList.remove("active"));
@@ -250,23 +269,38 @@ function switchTab(tab, el) {
 }
 
 // --- TEAMS ---
-async function loadTeams() {
+async function loadTeams(silent = false) {
   const res = await fetch(`${API}/teams?tournamentId=${activeTournamentId}`);
   currentTeams = await res.json();
   const list = document.getElementById("teams-list");
-  list.innerHTML = "";
 
-  // Populate Match Selects
+  if (!silent) list.innerHTML = "";
+
+  // Populate Selects
   const sA = document.getElementById("teamASelect");
   const sB = document.getElementById("teamBSelect");
-  sA.innerHTML = "<option value=''>Team A</option>";
-  sB.innerHTML = "<option value=''>Team B</option>";
-  currentTeams.forEach((t) => {
-    const opt = `<option value="${t.id}">${t.name}</option>`;
-    sA.innerHTML += opt;
-    sB.innerHTML += opt;
-  });
+  if (sA.innerHTML.length < 50 || !silent) {
+    // only update options if empty or full reload
+    sA.innerHTML = "<option value=''>Team A</option>";
+    sB.innerHTML = "<option value=''>Team B</option>";
+    currentTeams.forEach((t) => {
+      const opt = `<option value="${t.id}">${t.name}</option>`;
+      sA.innerHTML += opt;
+      sB.innerHTML += opt;
+    });
+  }
 
+  // Render list using diffing would be better, but simple innerHTML replacement is okay for small lists
+  if (!silent) {
+    renderTeamList(list);
+  } else if (document.activeElement.tagName !== "INPUT") {
+    // Only update live if user isn't typing
+    renderTeamList(list);
+  }
+}
+
+function renderTeamList(container) {
+  container.innerHTML = "";
   currentTeams.forEach((t) => {
     const pNames = t.team_players.map((tp) => tp.players.name).join(", ");
     const adminControls = isAdmin
@@ -274,13 +308,13 @@ async function loadTeams() {
        <div style="border-top:1px solid rgba(255,255,255,0.1); padding-top:8px; margin-top:8px; display:flex; justify-content:space-between; align-items:center;">
           <button class="btn-sm btn-primary" onclick="openPlayerPicker('${t.id}')">+ Player</button>
           <div>
-            <span class="btn-icon" style="font-size:14px;" onclick="renameTeam('${t.id}')">✏️</span>
+            <span class="btn-icon" style="font-size:14px;" onclick="prepareEditTeam('${t.id}')">✏️</span>
             <span class="btn-icon" style="color:var(--danger); font-size:14px;" onclick="deleteTeam('${t.id}')">🗑</span>
           </div>
        </div>`
       : "";
 
-    list.innerHTML += `<div class="card" style="border-left:5px solid ${
+    container.innerHTML += `<div class="card" style="border-left:5px solid ${
       t.jersey_color
     };">
        <div style="font-weight:bold;">${t.name}</div>
@@ -308,6 +342,8 @@ async function addTeam() {
       jerseyColor: color,
     }),
   });
+  document.getElementById("newTeamName").value = "";
+  showToast("Team Added");
   loadTeams();
 }
 async function deleteTeam(id) {
@@ -322,22 +358,38 @@ async function deleteTeam(id) {
   });
   loadTeams();
 }
-async function renameTeam(id) {
-  const n = prompt("New Name:");
-  if (n) {
-    await fetch(`${API}/teams`, {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ action: "rename", teamId: id, name: n }),
-    });
-    loadTeams();
-  }
+
+function prepareEditTeam(id) {
+  const t = currentTeams.find((x) => x.id === id);
+  document.getElementById("editTeamId").value = id;
+  document.getElementById("editTeamName").value = t.name;
+  document.getElementById("editTeamColor").value = t.jersey_color;
+  openModal("edit-team");
 }
 
-// --- PLAYER PICKER LOGIC ---
+async function saveTeamEdit() {
+  const id = document.getElementById("editTeamId").value;
+  const name = document.getElementById("editTeamName").value;
+  const color = document.getElementById("editTeamColor").value;
+  await fetch(`${API}/teams`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      action: "edit",
+      teamId: id,
+      name,
+      jerseyColor: color,
+    }),
+  });
+  forceCloseModal("edit-team");
+  showToast("Team Updated");
+  loadTeams();
+}
+
+// --- PLAYER PICKER ---
 async function openPlayerPicker(teamId) {
   document.getElementById("targetTeamId").value = teamId;
   const players = await loadAllPlayers();
@@ -347,13 +399,11 @@ async function openPlayerPicker(teamId) {
     .join("");
   openModal("pick-player");
 }
-
 async function addSelectedPlayer() {
   const teamId = document.getElementById("targetTeamId").value;
   const playerId = document.getElementById("globalPlayerSelect").value;
   await linkPlayer(teamId, playerId);
 }
-
 async function quickCreateAndAdd() {
   const name = document.getElementById("quickPlayerName").value;
   if (!name) return;
@@ -369,7 +419,6 @@ async function quickCreateAndAdd() {
   await linkPlayer(document.getElementById("targetTeamId").value, newP.id);
   document.getElementById("quickPlayerName").value = "";
 }
-
 async function linkPlayer(teamId, playerId) {
   await fetch(`${API}/teams`, {
     method: "PUT",
@@ -380,6 +429,7 @@ async function linkPlayer(teamId, playerId) {
     body: JSON.stringify({ action: "add_player", teamId, playerId }),
   });
   forceCloseModal("pick-player");
+  showToast("Player Added");
   loadTeams();
 }
 
@@ -412,9 +462,10 @@ async function clearFixtures() {
 async function scheduleMatch() {
   const tA = document.getElementById("teamASelect").value;
   const tB = document.getElementById("teamBSelect").value;
-  const d = document.getElementById("matchDate").value || activeTournamentDate; // Default to tourn date
+  const d = document.getElementById("matchDate").value || activeTournamentDate;
   const type = document.getElementById("matchTypeSelect").value;
   if (!tA || !tB) return alert("Select teams");
+
   await fetch(`${API}/matches`, {
     method: "POST",
     headers: {
@@ -429,18 +480,43 @@ async function scheduleMatch() {
       matchType: type,
     }),
   });
+
+  // Clear inputs
+  document.getElementById("teamASelect").value = "";
+  document.getElementById("teamBSelect").value = "";
+
+  showToast("Match Created");
   loadMatches();
 }
 
-async function loadMatches() {
+async function loadMatches(silent = false) {
   const res = await fetch(`${API}/matches?tournamentId=${activeTournamentId}`);
   currentMatches = await res.json();
-  const list = document.getElementById("matches-list");
-  list.innerHTML = "";
 
-  if (isAdmin) {
-    document.getElementById("btnGen").disabled = currentMatches.length > 0;
-    document.getElementById("matchDate").value = activeTournamentDate; // Auto-fill date
+  // SORT: Finals first, then by Order
+  currentMatches.sort((a, b) => {
+    if (a.match_type === "final" && b.match_type !== "final") return -1;
+    if (a.match_type !== "final" && b.match_type === "final") return 1;
+    return a.match_order - b.match_order;
+  });
+
+  if (!silent) renderMatchList(document.getElementById("matches-list"));
+  else if (document.activeElement.tagName !== "INPUT")
+    renderMatchList(document.getElementById("matches-list"));
+
+  if (isAdmin)
+    document.getElementById("matchDate").value = activeTournamentDate;
+}
+
+function renderMatchList(container) {
+  container.innerHTML = "";
+
+  if (isAdmin && currentMatches.length > 0) {
+    document.getElementById("btnGen").disabled = true;
+    document.getElementById("btnGen").style.opacity = "0.5";
+  } else if (isAdmin) {
+    document.getElementById("btnGen").disabled = false;
+    document.getElementById("btnGen").style.opacity = "1";
   }
 
   currentMatches.forEach((m) => {
@@ -451,6 +527,7 @@ async function loadMatches() {
     const isFinal = m.match_type === "final";
     const score =
       m.status === "finished" ? `${m.score_a} - ${m.score_b}` : "VS";
+    const scoreClass = m.status === "finished" ? "bg-green" : "";
 
     let reorderUI = isAdmin
       ? `
@@ -478,13 +555,13 @@ async function loadMatches() {
     div.innerHTML = `
        <div style="flex:1;">
          <div class="match-header"><span>${
-           isFinal ? "🏆 FINAL" : "Match " + Math.round(m.match_order)
+           isFinal ? "🏆 GRAND FINAL" : "Match " + Math.round(m.match_order)
          }</span> ${delBtn}</div>
          <div class="match-body">
            <div class="team-info"><div style="width:10px; height:10px; border-radius:50%; background:${cA}; box-shadow:0 0 5px ${cA};"></div><span style="font-weight:600; font-size:13px;">${
       m.team_a_name
     }</span></div>
-           <div class="score-badge">${score}</div>
+           <div class="score-badge ${scoreClass}">${score}</div>
            <div class="team-info" style="justify-content:flex-end;"><span style="font-weight:600; font-size:13px; text-align:right;">${
              m.team_b_name
            }</span><div style="width:10px; height:10px; border-radius:50%; background:${cB}; box-shadow:0 0 5px ${cB};"></div></div>
@@ -492,7 +569,7 @@ async function loadMatches() {
        </div>
        ${reorderUI}
      `;
-    list.appendChild(div);
+    container.appendChild(div);
   });
   calcStandings();
 }
@@ -510,7 +587,6 @@ async function moveMatch(e, id, order, dir) {
   });
   loadMatches();
 }
-
 async function deleteMatch(e, id) {
   e.stopPropagation();
   if (!confirm("Delete?")) return;
@@ -525,7 +601,6 @@ async function deleteMatch(e, id) {
   loadMatches();
 }
 
-// ... (Rest of logic: calcStandings, openMatchModal, saveScore - same as previous) ...
 function calcStandings() {
   const stats = {};
   currentTeams.forEach(
@@ -626,6 +701,7 @@ async function saveScore(id) {
     body: JSON.stringify({ matchId: id, scoreA: sa, scoreB: sb }),
   });
   forceCloseModal("match");
+  showToast("Score Updated");
   loadMatches();
 }
 

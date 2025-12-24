@@ -8,7 +8,7 @@
     />
     <title>League Manager</title>
     <style>
-      /* CSS Reset & Variables */
+      /* VARIABLES */
       :root {
         --bg: #0f172a;
         --surface: #1e293b;
@@ -47,7 +47,7 @@
         gap: 10px;
       }
 
-      /* Cards & Buttons */
+      /* COMPONENTS */
       .card {
         background: var(--surface);
         border-radius: 16px;
@@ -64,10 +64,18 @@
         font-size: 14px;
         width: 100%;
         box-sizing: border-box;
+        transition: transform 0.1s;
+      }
+      .btn:active {
+        transform: scale(0.98);
       }
       .btn-primary {
         background: var(--primary);
         color: white;
+      }
+      .btn-success {
+        background: var(--success);
+        color: #000;
       }
       .btn-danger {
         background: rgba(239, 68, 68, 0.2);
@@ -86,7 +94,6 @@
         width: auto;
       }
 
-      /* Inputs */
       input,
       select {
         width: 100%;
@@ -104,7 +111,6 @@
         border-color: var(--primary);
       }
 
-      /* Tabs */
       .tabs {
         display: flex;
         background: var(--surface);
@@ -127,7 +133,7 @@
         color: white;
       }
 
-      /* Match Card */
+      /* MATCH CARD STYLE */
       .match-card {
         display: flex;
         flex-direction: column;
@@ -139,6 +145,7 @@
       }
       .match-card.final-match {
         border: 1px solid var(--gold);
+        box-shadow: 0 0 15px rgba(234, 179, 8, 0.15);
       }
       .match-header {
         background: rgba(0, 0, 0, 0.2);
@@ -154,21 +161,30 @@
         justify-content: space-between;
         align-items: center;
       }
+
       .team-info {
         display: flex;
         align-items: center;
         gap: 8px;
         width: 40%;
       }
+      /* FIXED: Explicit Green Color Class */
       .score-badge {
         background: var(--bg);
         padding: 6px 12px;
         border-radius: 8px;
         font-weight: bold;
         font-size: 16px;
+        min-width: 40px;
+        text-align: center;
+      }
+      .bg-green {
+        background-color: #22c55e !important;
+        color: #000 !important;
+        border: 1px solid #16a34a;
       }
 
-      /* Reorder Controls (Big Buttons) */
+      /* CONTROLS */
       .reorder-controls {
         display: flex;
         flex-direction: column;
@@ -184,12 +200,8 @@
         align-items: center;
         justify-content: center;
       }
-      .reorder-btn:active {
-        background: rgba(255, 255, 255, 0.1);
-        color: white;
-      }
 
-      /* Table */
+      /* TABLE */
       table {
         width: 100%;
         border-collapse: collapse;
@@ -207,7 +219,7 @@
         border-bottom: 1px solid rgba(255, 255, 255, 0.05);
       }
 
-      /* Modals */
+      /* MODALS */
       .modal-overlay {
         position: fixed;
         top: 0;
@@ -229,20 +241,33 @@
         box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
       }
 
-      /* Collapsible */
+      /* TOAST */
+      #toast {
+        position: fixed;
+        bottom: 30px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--success);
+        color: black;
+        padding: 10px 20px;
+        border-radius: 20px;
+        font-weight: bold;
+        font-size: 14px;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s;
+        z-index: 200;
+      }
+      #toast.show {
+        opacity: 1;
+      }
+
       details > summary {
         list-style: none;
         cursor: pointer;
         color: var(--primary);
         font-weight: 600;
         padding: 10px 0;
-      }
-      details > summary::-webkit-details-marker {
-        display: none;
-      }
-      details[open] > summary {
-        margin-bottom: 10px;
-        border-bottom: 1px solid var(--surface-light);
       }
     </style>
   </head>
@@ -315,7 +340,6 @@
             </button>
           </div>
           <div id="tournament-list"></div>
-
           <div
             id="fab-add-tourn"
             class="hidden"
@@ -334,6 +358,7 @@
               font-size: 30px;
               box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
               cursor: pointer;
+              z-index: 50;
             "
           >
             +
@@ -441,12 +466,12 @@
               <div class="flex-between gap-10" style="margin-top: 10px">
                 <select id="matchTypeSelect" style="width: 140px; margin: 0">
                   <option value="normal">Normal</option>
-                  <option value="final">Finals</option>
+                  <option value="final">🏆 Grand Final</option>
                 </select>
                 <input type="date" id="matchDate" style="margin: 0" />
               </div>
               <button
-                class="btn btn-primary"
+                class="btn btn-success"
                 style="margin-top: 10px"
                 onclick="scheduleMatch()"
               >
@@ -523,6 +548,28 @@
       </div>
 
       <div
+        id="modal-edit-team"
+        class="modal-overlay hidden"
+        onclick="closeModal(event, 'edit-team')"
+      >
+        <div class="modal-content">
+          <h3>Edit Team</h3>
+          <input type="hidden" id="editTeamId" />
+          <label class="text-dim">Name</label>
+          <input id="editTeamName" />
+          <label class="text-dim">Jersey Color</label>
+          <input
+            id="editTeamColor"
+            type="color"
+            style="height: 50px; padding: 0; border: none"
+          />
+          <button class="btn btn-primary" onclick="saveTeamEdit()">
+            Update Team
+          </button>
+        </div>
+      </div>
+
+      <div
         id="modal-pick-player"
         class="modal-overlay hidden"
         onclick="closeModal(event, 'pick-player')"
@@ -530,7 +577,6 @@
         <div class="modal-content">
           <h3>Add Player to Team</h3>
           <input type="hidden" id="targetTeamId" />
-
           <label
             style="color: var(--primary); font-size: 12px; font-weight: bold"
             >SEARCH EXISTING</label
@@ -543,7 +589,6 @@
           >
             Add Selected
           </button>
-
           <div
             style="
               text-align: center;
@@ -554,7 +599,6 @@
           >
             - OR -
           </div>
-
           <label
             style="color: var(--success); font-size: 12px; font-weight: bold"
             >CREATE & ADD NEW</label
@@ -581,6 +625,8 @@
           <div id="match-modal-content"></div>
         </div>
       </div>
+
+      <div id="toast">✅ Action Successful</div>
     </div>
     <script src="app.js"></script>
   </body>
