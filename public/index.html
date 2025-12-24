@@ -11,7 +11,6 @@
 
     <input id="username" placeholder="Username" />
     <input id="password" type="password" placeholder="Password" />
-
     <button onclick="login()">Login</button>
     <button onclick="signup()">Sign Up</button>
 
@@ -21,6 +20,46 @@
     <button onclick="loadTeams()">View Teams</button>
     <button onclick="addPlayer()">Add Player (Admin)</button>
     <button onclick="addTeam()">Add Team (Admin)</button>
+
+    <hr />
+
+    <div id="match-section">
+      <h3>📅 Matches</h3>
+
+      <div
+        id="admin-match-form"
+        style="
+          display: none;
+          background: #1e293b;
+          padding: 15px;
+          border-radius: 12px;
+          margin-bottom: 20px;
+        "
+      >
+        <h4 style="margin-top: 0">Schedule Match</h4>
+        <select id="teamASelect">
+          <option>Select Team A</option>
+        </select>
+        <div
+          style="
+            text-align: center;
+            padding: 5px;
+            font-weight: bold;
+            color: #94a3b8;
+          "
+        >
+          VS
+        </div>
+        <select id="teamBSelect">
+          <option>Select Team B</option>
+        </select>
+        <input type="datetime-local" id="matchDate" />
+        <button onclick="scheduleMatch()">Create Match</button>
+      </div>
+
+      <button onclick="loadMatches()">🔄 Refresh Matches</button>
+      <div id="matches-list"></div>
+    </div>
 
     <pre id="output"></pre>
 
