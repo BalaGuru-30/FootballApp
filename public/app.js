@@ -17,7 +17,7 @@ function init() {
         isAdmin = true;
         // CHANGE 1: Admin Title
         document.getElementById("app-title").textContent =
-          "🏆 LeagueMgr (Admin mode)";
+          "🏆 LeagueMgr (Admin)";
         document.getElementById("loginBtn").classList.add("hidden");
         document.getElementById("logoutBtn").classList.remove("hidden");
         document.getElementById("fab-add-tourn").classList.remove("hidden");
