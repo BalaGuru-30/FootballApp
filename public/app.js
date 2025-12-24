@@ -6,7 +6,8 @@ let activeTournamentDate = null;
 let allTournaments = [];
 let currentTeams = [];
 let currentMatches = [];
-let activeTab = "standings"; // Track active tab for auto-refresh
+let activeTab = "standings";
+let currentFilterTeamId = "all"; // STORE FILTER STATE
 
 function init() {
   if (token) {
@@ -27,12 +28,12 @@ function init() {
   }
   loadTournaments();
 
-  // REAL-TIME AUTO REFRESH (Every 3 seconds)
+  // REAL-TIME POLLING
   setInterval(() => {
     if (activeTournamentId && !document.hidden) {
-      if (activeTab === "fixtures") loadMatches(true); // true = silent refresh
+      if (activeTab === "fixtures") loadMatches(true);
       if (activeTab === "teams") loadTeams(true);
-      if (activeTab === "standings") loadMatches(true); // Matches update standings
+      if (activeTab === "standings") loadMatches(true);
     }
   }, 3000);
 }
@@ -152,7 +153,6 @@ async function createTournament() {
   forceCloseModal("create-tourn");
   loadTournaments();
 }
-
 async function deleteTournament(id) {
   if (!confirm("Delete this tournament?")) return;
   await fetch(`${API}/tournaments`, {
@@ -165,7 +165,6 @@ async function deleteTournament(id) {
   });
   loadTournaments();
 }
-
 function prepareEditTourn(id) {
   const t = allTournaments.find((x) => x.id === id);
   document.getElementById("editTournId").value = id;
@@ -173,7 +172,6 @@ function prepareEditTourn(id) {
   document.getElementById("editTournDate").value = t.tournament_date;
   openModal("edit-tourn");
 }
-
 async function updateTournament() {
   const id = document.getElementById("editTournId").value;
   const name = document.getElementById("editTournName").value;
@@ -276,27 +274,30 @@ async function loadTeams(silent = false) {
 
   if (!silent) list.innerHTML = "";
 
-  // Populate Selects
+  // Update Dropdowns for Match Creation & Filtering
   const sA = document.getElementById("teamASelect");
   const sB = document.getElementById("teamBSelect");
+  const filterSel = document.getElementById("fixtureFilter");
+
   if (sA.innerHTML.length < 50 || !silent) {
-    // only update options if empty or full reload
+    const allOpt = "<option value='all'>Show All Teams</option>";
     sA.innerHTML = "<option value=''>Team A</option>";
     sB.innerHTML = "<option value=''>Team B</option>";
+    // Only rebuild filter if not open (prevents reset while using)
+    if (document.activeElement !== filterSel) filterSel.innerHTML = allOpt;
+
     currentTeams.forEach((t) => {
       const opt = `<option value="${t.id}">${t.name}</option>`;
       sA.innerHTML += opt;
       sB.innerHTML += opt;
+      if (document.activeElement !== filterSel) filterSel.innerHTML += opt;
     });
+    // Restore filter value
+    filterSel.value = currentFilterTeamId;
   }
 
-  // Render list using diffing would be better, but simple innerHTML replacement is okay for small lists
-  if (!silent) {
-    renderTeamList(list);
-  } else if (document.activeElement.tagName !== "INPUT") {
-    // Only update live if user isn't typing
-    renderTeamList(list);
-  }
+  if (!silent) renderTeamList(list);
+  else if (document.activeElement.tagName !== "INPUT") renderTeamList(list);
 }
 
 function renderTeamList(container) {
@@ -358,7 +359,6 @@ async function deleteTeam(id) {
   });
   loadTeams();
 }
-
 function prepareEditTeam(id) {
   const t = currentTeams.find((x) => x.id === id);
   document.getElementById("editTeamId").value = id;
@@ -366,7 +366,6 @@ function prepareEditTeam(id) {
   document.getElementById("editTeamColor").value = t.jersey_color;
   openModal("edit-team");
 }
-
 async function saveTeamEdit() {
   const id = document.getElementById("editTeamId").value;
   const name = document.getElementById("editTeamName").value;
@@ -388,8 +387,6 @@ async function saveTeamEdit() {
   showToast("Team Updated");
   loadTeams();
 }
-
-// --- PLAYER PICKER ---
 async function openPlayerPicker(teamId) {
   document.getElementById("targetTeamId").value = teamId;
   const players = await loadAllPlayers();
@@ -434,6 +431,11 @@ async function linkPlayer(teamId, playerId) {
 }
 
 // --- MATCHES ---
+function applyFixtureFilter() {
+  currentFilterTeamId = document.getElementById("fixtureFilter").value;
+  renderMatchList(document.getElementById("matches-list"));
+}
+
 async function generateFixtures() {
   if (!confirm("Generate matches?")) return;
   const r = document.getElementById("genRounds").value;
@@ -465,7 +467,6 @@ async function scheduleMatch() {
   const d = document.getElementById("matchDate").value || activeTournamentDate;
   const type = document.getElementById("matchTypeSelect").value;
   if (!tA || !tB) return alert("Select teams");
-
   await fetch(`${API}/matches`, {
     method: "POST",
     headers: {
@@ -480,11 +481,8 @@ async function scheduleMatch() {
       matchType: type,
     }),
   });
-
-  // Clear inputs
   document.getElementById("teamASelect").value = "";
   document.getElementById("teamBSelect").value = "";
-
   showToast("Match Created");
   loadMatches();
 }
@@ -493,7 +491,7 @@ async function loadMatches(silent = false) {
   const res = await fetch(`${API}/matches?tournamentId=${activeTournamentId}`);
   currentMatches = await res.json();
 
-  // SORT: Finals first, then by Order
+  // SORT
   currentMatches.sort((a, b) => {
     if (a.match_type === "final" && b.match_type !== "final") return -1;
     if (a.match_type !== "final" && b.match_type === "final") return 1;
@@ -520,6 +518,15 @@ function renderMatchList(container) {
   }
 
   currentMatches.forEach((m) => {
+    // FILTER LOGIC
+    if (currentFilterTeamId !== "all") {
+      if (
+        m.team_a_id !== currentFilterTeamId &&
+        m.team_b_id !== currentFilterTeamId
+      )
+        return;
+    }
+
     const tA = currentTeams.find((t) => t.id === m.team_a_id);
     const tB = currentTeams.find((t) => t.id === m.team_b_id);
     const cA = tA ? tA.jersey_color : "#fff";
@@ -536,7 +543,6 @@ function renderMatchList(container) {
          <div class="reorder-btn" onclick="moveMatch(event, '${m.id}', ${m.match_order}, 1)">▼</div>
        </div>`
       : "";
-
     let delBtn = isAdmin
       ? `<span style="color:var(--danger); cursor:pointer;" onclick="deleteMatch(event, '${m.id}')">🗑</span>`
       : "";
