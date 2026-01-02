@@ -1,79 +1,50 @@
-import { createClient } from "@supabase/supabase-js";
+const { supabase } = require("./_supabase");
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
-
-export default async function handler(req, res) {
-  // CORS
-  res.setHeader("Access-Control-Allow-Credentials", true);
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader(
-    "Access-Control-Allow-Methods",
-    "GET,OPTIONS,PATCH,DELETE,POST,PUT"
-  );
-  res.setHeader(
-    "Access-Control-Allow-Headers",
-    "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization"
-  );
-
-  if (req.method === "OPTIONS") {
-    res.status(200).end();
-    return;
+function getUser(req) {
+  try {
+    return JSON.parse(
+      Buffer.from(req.headers.authorization.split(" ")[1], "base64").toString()
+    );
+  } catch {
+    return null;
   }
+}
 
-  // --- GET TEAMS ---
+module.exports = async function handler(req, res) {
+  const user = getUser(req);
+  const { tournamentId } = req.query;
+
+  // GET
   if (req.method === "GET") {
-    const { tournamentId } = req.query;
-    if (!tournamentId)
-      return res.status(400).json({ error: "Missing tournamentId" });
-
-    const { data, error } = await supabase
+    let query = supabase
       .from("teams")
-      .select("*, team_players(player_id, players(name))")
+      .select("*, team_players(players(*))")
       .eq("tournament_id", tournamentId)
-      .order("name", { ascending: true });
-
+      .order("name");
+    const { data, error } = await query;
     if (error) return res.status(500).json({ error: error.message });
-    return res.status(200).json(data);
+    return res.json(data);
   }
 
-  // --- CREATE TEAM ---
+  // ADMIN ONLY
+  if (!user || !user.isAdmin)
+    return res.status(403).json({ error: "Admin only" });
+
+  // POST
   if (req.method === "POST") {
-    const { name, tournamentId, jerseyColor } = req.body;
-    const { data, error } = await supabase
-      .from("teams")
-      .insert([
-        { name, tournament_id: tournamentId, jersey_color: jerseyColor },
-      ])
-      .select();
-
+    const { name, tournamentId: tid, jerseyColor } = req.body;
+    const { error } = await supabase.from("teams").insert({
+      name,
+      tournament_id: tid,
+      jersey_color: jerseyColor || "#ffffff",
+    });
     if (error) return res.status(500).json({ error: error.message });
-    return res.status(200).json(data[0]);
+    return res.json({ message: "Team created" });
   }
 
-  // --- UPDATE / MANAGE TEAM ---
+  // PUT: Rename, Edit Color, Add/Remove Player
   if (req.method === "PUT") {
-    const { action, teamId, playerId, name, jerseyColor } = req.body;
-
-    if (action === "add_player") {
-      const { error } = await supabase
-        .from("team_players")
-        .insert([{ team_id: teamId, player_id: playerId }]);
-      if (error) return res.status(500).json({ error: error.message });
-      return res.status(200).json({ success: true });
-    }
-
-    if (action === "remove_player") {
-      // BUG FIX: Correctly targeting the row in the junction table
-      const { error } = await supabase
-        .from("team_players")
-        .delete()
-        .match({ team_id: teamId, player_id: playerId }); // Ensures we only delete this specific link
-
-      if (error) return res.status(500).json({ error: error.message });
-      return res.status(200).json({ success: true });
-    }
+    const { action, teamId, name, jerseyColor, playerId } = req.body;
 
     if (action === "edit") {
       const { error } = await supabase
@@ -81,22 +52,33 @@ export default async function handler(req, res) {
         .update({ name, jersey_color: jerseyColor })
         .eq("id", teamId);
       if (error) return res.status(500).json({ error: error.message });
-      return res.status(200).json({ success: true });
+      return res.json({ message: "Team updated" });
+    }
+
+    if (action === "add_player") {
+      const { error } = await supabase
+        .from("team_players")
+        .insert({ team_id: teamId, player_id: playerId });
+      if (error) return res.status(500).json({ error: error.message });
+      return res.json({ message: "Player added" });
+    }
+
+    // NEW: Remove Player Logic
+    if (action === "remove_player") {
+      const { error } = await supabase
+        .from("team_players")
+        .delete()
+        .match({ team_id: teamId, player_id: playerId });
+      if (error) return res.status(500).json({ error: error.message });
+      return res.json({ message: "Player removed" });
     }
   }
 
-  // --- DELETE TEAM ---
+  // DELETE TEAM
   if (req.method === "DELETE") {
     const { id } = req.body;
-    // Delete matches first (optional depending on cascade settings, but safer)
-    await supabase
-      .from("matches")
-      .delete()
-      .or(`team_a_id.eq.${id},team_b_id.eq.${id}`);
-    await supabase.from("team_players").delete().eq("team_id", id);
-
     const { error } = await supabase.from("teams").delete().eq("id", id);
     if (error) return res.status(500).json({ error: error.message });
-    return res.status(200).json({ success: true });
+    return res.json({ message: "Deleted" });
   }
-}
+};
