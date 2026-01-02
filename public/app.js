@@ -204,13 +204,21 @@ function renderPaginatedSection(type) {
 
   if (list.length > PAGE_SIZE) {
     controls.classList.remove("hidden");
-    document.getElementById(`page-num-${type}`).textContent = `Page ${page}`;
-    document.getElementById(`btn-prev-${type}`).disabled = page === 1;
-    document.getElementById(`btn-prev-${type}`).style.opacity =
-      page === 1 ? "0.3" : "1";
-    document.getElementById(`btn-next-${type}`).disabled = end >= list.length;
-    document.getElementById(`btn-next-${type}`).style.opacity =
-      end >= list.length ? "0.3" : "1";
+    // SMART PAGINATION LOGIC
+    const totalPages = Math.ceil(list.length / PAGE_SIZE);
+
+    document.getElementById(
+      `page-num-${type}`
+    ).textContent = `${page} / ${totalPages}`;
+
+    const prevBtn = document.getElementById(`btn-prev-${type}`);
+    const nextBtn = document.getElementById(`btn-next-${type}`);
+
+    prevBtn.disabled = page === 1;
+    prevBtn.style.opacity = page === 1 ? "0.3" : "1";
+
+    nextBtn.disabled = page >= totalPages;
+    nextBtn.style.opacity = page >= totalPages ? "0.3" : "1";
   } else {
     controls.classList.add("hidden");
   }
