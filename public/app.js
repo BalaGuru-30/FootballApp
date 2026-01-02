@@ -10,7 +10,7 @@ let activeTab = "standings";
 let currentFilterTeamId = "all";
 
 // Pagination & Tab State
-let activeTournTab = "today"; // 'today', 'upcoming', 'past'
+let activeTournTab = "today";
 let upcomingPage = 1;
 let pastPage = 1;
 const PAGE_SIZE = 5;
@@ -39,19 +39,16 @@ function init() {
   loadTournaments();
 
   setInterval(() => {
-    if (!document.hidden) {
-      if (activeTournamentId) {
-        if (activeTab === "fixtures") loadMatches(true);
-        if (activeTab === "teams") loadTeams(true);
-        if (activeTab === "standings") loadMatches(true);
-      }
-      if (
-        document
-          .getElementById("section-players")
-          .classList.contains("hidden") === false
-      ) {
-        loadAllPlayers();
-      }
+    if (!document.hidden && activeTournamentId) {
+      if (activeTab === "fixtures") loadMatches(true);
+      if (activeTab === "teams") loadTeams(true);
+      if (activeTab === "standings") loadMatches(true);
+    }
+    if (
+      !document.hidden &&
+      !document.getElementById("section-players").classList.contains("hidden")
+    ) {
+      loadAllPlayers();
     }
   }, 3000);
 }
@@ -75,21 +72,16 @@ function showSection(id, tabEl) {
   if (id === "players") loadAllPlayers();
 }
 
-// NEW: Switch between Live, Upcoming, History
 function switchTournTab(tab) {
   activeTournTab = tab;
-  // Update Buttons
   document.querySelectorAll(".segment-btn").forEach((b) => {
     b.classList.remove("active");
     if (b.id === `seg-${tab}`) b.classList.add("active");
   });
-  // Update Content
-  document.querySelectorAll(".tourn-tab-content").forEach((c) => {
-    c.classList.add("hidden");
-  });
+  document
+    .querySelectorAll(".tourn-tab-content")
+    .forEach((c) => c.classList.add("hidden"));
   document.getElementById(`tourn-tab-${tab}`).classList.remove("hidden");
-
-  // Refresh view to ensure pagination resets or displays correctly
   renderTournaments(allTournaments);
 }
 
@@ -133,14 +125,16 @@ function logout() {
 
 // --- TOURNAMENTS ---
 async function loadTournaments() {
-  const res = await fetch(`${API}/tournaments`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  allTournaments = await res.json();
-
-  // Decide default tab logic: if no today, maybe show upcoming?
-  // For now, default to 'today' as initialized.
-  renderTournaments(allTournaments);
+  try {
+    const res = await fetch(`${API}/tournaments`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    allTournaments = await res.json();
+    if (!Array.isArray(allTournaments)) allTournaments = [];
+    renderTournaments(allTournaments);
+  } catch (e) {
+    console.error(e);
+  }
 }
 
 function renderTournaments(list) {
@@ -164,13 +158,10 @@ function renderTournaments(list) {
     }
   });
 
-  upcomingList.reverse(); // ASC order
-  // Past is already DESC
-
+  upcomingList.reverse();
   currentUpcomingList = upcomingList;
   currentPastList = pastList;
 
-  // 1. Render Today (Always all items, no pagination)
   const todayContainer = document.getElementById("list-today");
   const todayHeader = document.getElementById("today-header");
   todayContainer.innerHTML = "";
@@ -182,7 +173,6 @@ function renderTournaments(list) {
     todayContainer.innerHTML = `<div style="text-align:center; color:var(--text-dim); padding:20px;">No tournaments today</div>`;
   }
 
-  // 2. Render Upcoming & Past (Paginated)
   renderPaginatedSection("upcoming");
   renderPaginatedSection("past");
 }
@@ -206,7 +196,6 @@ function renderPaginatedSection(type) {
 
   slice.forEach((t) => container.appendChild(createTournCard(t)));
 
-  // Pagination UI
   if (list.length > PAGE_SIZE) {
     controls.classList.remove("hidden");
     document.getElementById(`page-num-${type}`).textContent = `Page ${page}`;
@@ -222,11 +211,8 @@ function renderPaginatedSection(type) {
 }
 
 function changePage(type, delta) {
-  if (type === "upcoming") {
-    upcomingPage += delta;
-  } else {
-    pastPage += delta;
-  }
+  if (type === "upcoming") upcomingPage += delta;
+  else pastPage += delta;
   renderPaginatedSection(type);
 }
 
@@ -316,26 +302,31 @@ async function updateTournament() {
 
 // --- GLOBAL PLAYERS ---
 async function loadAllPlayers() {
-  const res = await fetch(`${API}/players`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  const players = await res.json();
-  const list = document.getElementById("all-players-list");
+  try {
+    const res = await fetch(`${API}/players`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const players = await res.json();
+    const list = document.getElementById("all-players-list");
 
-  if (
-    list.childElementCount === players.length &&
-    document.activeElement.tagName !== "INPUT"
-  )
+    if (!Array.isArray(players)) return;
+    if (
+      list.childElementCount === players.length &&
+      document.activeElement.tagName !== "INPUT"
+    )
+      return players;
+
+    list.innerHTML = "";
+    players.forEach((p) => {
+      const delBtn = isAdmin
+        ? `<span onclick="deleteGlobalPlayer('${p.id}')" style="color:var(--danger); cursor:pointer;">×</span>`
+        : "";
+      list.innerHTML += `<div class="card" style="padding:10px; display:flex; justify-content:space-between;"><span>${p.name}</span>${delBtn}</div>`;
+    });
     return players;
-
-  list.innerHTML = "";
-  players.forEach((p) => {
-    const delBtn = isAdmin
-      ? `<span onclick="deleteGlobalPlayer('${p.id}')" style="color:var(--danger); cursor:pointer;">×</span>`
-      : "";
-    list.innerHTML += `<div class="card" style="padding:10px; display:flex; justify-content:space-between;"><span>${p.name}</span>${delBtn}</div>`;
-  });
-  return players;
+  } catch (e) {
+    console.error(e);
+  }
 }
 async function createGlobalPlayer() {
   const name = document.getElementById("newGlobalPlayer").value;
@@ -401,61 +392,77 @@ function switchTab(tab, el) {
 
 // --- TEAMS ---
 async function loadTeams(silent = false) {
-  const res = await fetch(`${API}/teams?tournamentId=${activeTournamentId}`);
-  currentTeams = await res.json();
-  const list = document.getElementById("teams-list");
+  try {
+    const res = await fetch(`${API}/teams?tournamentId=${activeTournamentId}`);
+    const data = await res.json();
 
-  if (!silent) list.innerHTML = "";
+    if (Array.isArray(data)) {
+      currentTeams = data;
+    } else {
+      currentTeams = [];
+    }
 
-  const sA = document.getElementById("teamASelect");
-  const sB = document.getElementById("teamBSelect");
+    const list = document.getElementById("teams-list");
+    if (!silent) list.innerHTML = "";
 
-  if (sA.innerHTML.length < 50 || !silent) {
-    sA.innerHTML = "<option value=''>Select Team</option>";
-    sB.innerHTML = "<option value=''>Select Team</option>";
-    const filterSel = document.getElementById("fixtureFilter");
-    const allOpt = "<option value='all'>Show All Teams</option>";
-    if (document.activeElement !== filterSel) filterSel.innerHTML = allOpt;
+    const sA = document.getElementById("teamASelect");
+    const sB = document.getElementById("teamBSelect");
 
-    currentTeams.forEach((t) => {
-      const opt = `<option value="${t.id}">${t.name}</option>`;
-      sA.innerHTML += opt;
-      sB.innerHTML += opt;
-      if (document.activeElement !== filterSel) filterSel.innerHTML += opt;
-    });
-    filterSel.value = currentFilterTeamId;
+    if (sA.innerHTML.length < 50 || !silent) {
+      sA.innerHTML = "<option value=''>Select Team</option>";
+      sB.innerHTML = "<option value=''>Select Team</option>";
+      const filterSel = document.getElementById("fixtureFilter");
+      const allOpt = "<option value='all'>Show All Teams</option>";
+      if (document.activeElement !== filterSel) filterSel.innerHTML = allOpt;
+
+      currentTeams.forEach((t) => {
+        const opt = `<option value="${t.id}">${t.name}</option>`;
+        sA.innerHTML += opt;
+        sB.innerHTML += opt;
+        if (document.activeElement !== filterSel) filterSel.innerHTML += opt;
+      });
+      filterSel.value = currentFilterTeamId;
+    }
+
+    if (!silent) renderTeamList(list);
+    else if (document.activeElement.tagName !== "INPUT") renderTeamList(list);
+  } catch (e) {
+    console.error(e);
   }
-
-  if (!silent) renderTeamList(list);
-  else if (document.activeElement.tagName !== "INPUT") renderTeamList(list);
 }
 
 function renderTeamList(container) {
   container.innerHTML = "";
+  if (!currentTeams || currentTeams.length === 0) {
+    container.innerHTML =
+      "<div style='color:var(--text-dim); text-align:center; padding:20px;'>No Teams Found</div>";
+    return;
+  }
+
   currentTeams.forEach((t) => {
-    const rosterHtml = t.team_players
-      .map(
-        (tp) => `
-        <span class="roster-tag">
-          ${tp.players.name} 
-          ${
-            isAdmin
-              ? `<span class="roster-rm" onclick="removePlayerFromTeam('${
-                  t.id
-                }', '${tp.player_id}', '${tp.players.name.replace(
-                  /'/g,
-                  "\\'"
-                )}')">×</span>`
-              : ""
-          }
-        </span>
-     `
-      )
+    const rosterHtml = (t.team_players || [])
+      .map((tp) => {
+        const pName = tp.players ? tp.players.name : "Unknown";
+        return `
+            <span class="roster-tag">
+            ${pName} 
+            ${
+              isAdmin
+                ? `<span class="roster-rm" onclick="removePlayerFromTeam('${
+                    t.id
+                  }', '${tp.player_id}', '${pName.replace(
+                    /'/g,
+                    "\\'"
+                  )}')">×</span>`
+                : ""
+            }
+            </span>
+        `;
+      })
       .join(" ");
 
     const adminControls = isAdmin
-      ? `
-       <div style="border-top:1px solid rgba(255,255,255,0.1); padding-top:8px; margin-top:8px; display:flex; justify-content:space-between; align-items:center;">
+      ? `<div style="border-top:1px solid rgba(255,255,255,0.1); padding-top:8px; margin-top:8px; display:flex; justify-content:space-between; align-items:center;">
           <button class="btn-sm btn-primary" onclick="openPlayerPicker('${t.id}')">+ Player</button>
           <div>
             <span class="btn-icon" style="font-size:14px;" onclick="prepareEditTeam('${t.id}')">✏️</span>
@@ -539,11 +546,13 @@ async function saveTeamEdit() {
 async function openPlayerPicker(teamId) {
   document.getElementById("targetTeamId").value = teamId;
   const players = await loadAllPlayers();
-  const sel = document.getElementById("globalPlayerSelect");
-  sel.innerHTML = players
-    .map((p) => `<option value="${p.id}">${p.name}</option>`)
-    .join("");
-  openModal("pick-player");
+  if (players) {
+    const sel = document.getElementById("globalPlayerSelect");
+    sel.innerHTML = players
+      .map((p) => `<option value="${p.id}">${p.name}</option>`)
+      .join("");
+    openModal("pick-player");
+  }
 }
 async function addSelectedPlayer() {
   const teamId = document.getElementById("targetTeamId").value;
@@ -588,6 +597,7 @@ async function removePlayerFromTeam(teamId, playerId, playerName) {
     },
     body: JSON.stringify({ action: "remove_player", teamId, playerId }),
   });
+  showToast("Player Removed"); // Added Toast here
   loadTeams();
 }
 
@@ -654,22 +664,33 @@ async function scheduleMatch() {
 }
 
 async function loadMatches(silent = false) {
-  const res = await fetch(`${API}/matches?tournamentId=${activeTournamentId}`);
-  currentMatches = await res.json();
+  try {
+    const res = await fetch(
+      `${API}/matches?tournamentId=${activeTournamentId}`
+    );
+    const data = await res.json();
 
-  // Sort: Finals top, then match order
-  currentMatches.sort((a, b) => {
-    if (a.match_type === "final" && b.match_type !== "final") return -1;
-    if (a.match_type !== "final" && b.match_type === "final") return 1;
-    return a.match_order - b.match_order;
-  });
+    if (Array.isArray(data)) {
+      currentMatches = data;
+    } else {
+      currentMatches = [];
+    }
 
-  if (!silent) {
-    renderMatchList(document.getElementById("matches-list"));
-    renderFinalsSection();
-  } else if (document.activeElement.tagName !== "INPUT") {
-    renderMatchList(document.getElementById("matches-list"));
-    renderFinalsSection();
+    currentMatches.sort((a, b) => {
+      if (a.match_type === "final" && b.match_type !== "final") return -1;
+      if (a.match_type !== "final" && b.match_type === "final") return 1;
+      return a.match_order - b.match_order;
+    });
+
+    if (!silent) {
+      renderMatchList(document.getElementById("matches-list"));
+      renderFinalsSection();
+    } else if (document.activeElement.tagName !== "INPUT") {
+      renderMatchList(document.getElementById("matches-list"));
+      renderFinalsSection();
+    }
+  } catch (e) {
+    console.error(e);
   }
 }
 
@@ -712,11 +733,10 @@ function renderMatchList(container) {
 
     let reorderUI =
       isAdmin && !isFinal
-        ? `
-       <div class="reorder-controls">
-         <div class="reorder-btn" onclick="moveMatch(event, ${index}, -1)">▲</div>
-         <div class="reorder-btn" onclick="moveMatch(event, ${index}, 1)">▼</div>
-       </div>`
+        ? `<div class="reorder-controls">
+             <div class="reorder-btn" onclick="moveMatch(event, ${index}, -1)">▲</div>
+             <div class="reorder-btn" onclick="moveMatch(event, ${index}, 1)">▼</div>
+           </div>`
         : "";
 
     const div = document.createElement("div");
@@ -754,13 +774,15 @@ async function autoUpdateFinals() {
     if (m.status === "finished" && m.match_type !== "final") {
       const a = m.team_a_id,
         b = m.team_b_id;
-      stats[a].gd += m.score_a - m.score_b;
-      stats[b].gd += m.score_b - m.score_a;
-      if (m.score_a > m.score_b) stats[a].pts += 3;
-      else if (m.score_b > m.score_a) stats[b].pts += 3;
-      else {
-        stats[a].pts++;
-        stats[b].pts++;
+      if (stats[a] && stats[b]) {
+        stats[a].gd += m.score_a - m.score_b;
+        stats[b].gd += m.score_b - m.score_a;
+        if (m.score_a > m.score_b) stats[a].pts += 3;
+        else if (m.score_b > m.score_a) stats[b].pts += 3;
+        else {
+          stats[a].pts++;
+          stats[b].pts++;
+        }
       }
     }
   });
@@ -897,6 +919,9 @@ async function deleteMatch(e, id) {
 
 function calcStandings() {
   const stats = {};
+
+  if (!Array.isArray(currentTeams)) return;
+
   currentTeams.forEach(
     (t) =>
       (stats[t.id] = {
@@ -910,32 +935,36 @@ function calcStandings() {
         color: t.jersey_color,
       })
   );
-  currentMatches.forEach((m) => {
-    if (m.status === "finished" && m.match_type !== "final") {
-      const a = m.team_a_id,
-        b = m.team_b_id;
-      if (stats[a] && stats[b]) {
-        stats[a].p++;
-        stats[b].p++;
-        stats[a].gd += m.score_a - m.score_b;
-        stats[b].gd += m.score_b - m.score_a;
-        if (m.score_a > m.score_b) {
-          stats[a].w++;
-          stats[a].pts += 3;
-          stats[b].l++;
-        } else if (m.score_b > m.score_a) {
-          stats[b].w++;
-          stats[b].pts += 3;
-          stats[a].l++;
-        } else {
-          stats[a].d++;
-          stats[a].pts++;
-          stats[b].d++;
-          stats[b].pts++;
+
+  if (Array.isArray(currentMatches)) {
+    currentMatches.forEach((m) => {
+      if (m.status === "finished" && m.match_type !== "final") {
+        const a = m.team_a_id,
+          b = m.team_b_id;
+        if (stats[a] && stats[b]) {
+          stats[a].p++;
+          stats[b].p++;
+          stats[a].gd += m.score_a - m.score_b;
+          stats[b].gd += m.score_b - m.score_a;
+          if (m.score_a > m.score_b) {
+            stats[a].w++;
+            stats[a].pts += 3;
+            stats[b].l++;
+          } else if (m.score_b > m.score_a) {
+            stats[b].w++;
+            stats[b].pts += 3;
+            stats[a].l++;
+          } else {
+            stats[a].d++;
+            stats[a].pts++;
+            stats[b].d++;
+            stats[b].pts++;
+          }
         }
       }
-    }
-  });
+    });
+  }
+
   const sorted = Object.values(stats).sort(
     (a, b) => b.pts - a.pts || b.gd - a.gd
   );
@@ -964,26 +993,74 @@ function openMatchModal(m, tA, tB) {
 
   const cA = tA ? tA.jersey_color : "#fff";
   const cB = tB ? tB.jersey_color : "#fff";
+
+  // NEW UI for Admin
   const adminUI = isAdmin
-    ? `<div style="display:flex; justify-content:center; gap:10px; margin-top:20px;"><input id="scoreA" type="number" inputmode="numeric" value="${
-        m.score_a || 0
-      }" style="width:60px; font-size:20px; text-align:center;"><span style="font-size:20px; align-self:center;">-</span><input id="scoreB" type="number" inputmode="numeric" value="${
-        m.score_b || 0
-      }" style="width:60px; font-size:20px; text-align:center;"></div><button class="btn btn-primary" onclick="saveScore('${
-        m.id
-      }')" style="margin-top:15px;">Update Score</button>`
+    ? `
+    <div style="margin-top:20px;">
+        <div style="display:flex; justify-content:center; gap:20px;">
+            <div class="score-wrapper">
+                <div class="score-input-container">
+                    <input id="scoreA" type="number" inputmode="numeric" value="${
+                      m.score_a !== null ? m.score_a : 0
+                    }">
+                    <div class="score-arrows">
+                        <button class="arrow-btn" onclick="adjustScore('scoreA', 1)">▲</button>
+                        <button class="arrow-btn" onclick="adjustScore('scoreA', -1)">▼</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="score-wrapper">
+                <div class="score-input-container">
+                    <input id="scoreB" type="number" inputmode="numeric" value="${
+                      m.score_b !== null ? m.score_b : 0
+                    }">
+                    <div class="score-arrows">
+                        <button class="arrow-btn" onclick="adjustScore('scoreB', 1)">▲</button>
+                        <button class="arrow-btn" onclick="adjustScore('scoreB', -1)">▼</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <button class="btn btn-primary" onclick="saveScore('${
+          m.id
+        }')" style="margin-top:25px;">Update Score</button>
+    </div>
+    
+    <div class="reset-btn" onclick="resetMatch('${m.id}')">Reset Match</div>
+    `
     : "";
-  document.getElementById(
-    "match-modal-content"
-  ).innerHTML = `<div style="text-align:center;"><div style="font-size:12px; margin-bottom:10px;">${
-    m.match_type === "final" ? "🏆 GRAND FINAL" : "Match Details"
-  }</div><div style="display:flex; justify-content:center; align-items:center; gap:20px;"><div style="text-align:center;"><div style="width:40px; height:40px; background:${cA}; border-radius:50%; margin:0 auto 5px auto; box-shadow:0 0 10px ${cA};"></div><div style="font-weight:bold;">${
-    m.team_a_name
-  }</div></div><div style="font-size:30px; font-weight:800;">${
-    m.status === "finished" ? m.score_a + "-" + m.score_b : "VS"
-  }</div><div style="text-align:center;"><div style="width:40px; height:40px; background:${cB}; border-radius:50%; margin:0 auto 5px auto; box-shadow:0 0 10px ${cB};"></div><div style="font-weight:bold;">${
-    m.team_b_name
-  }</div></div></div>${adminUI}</div>`;
+
+  document.getElementById("match-modal-content").innerHTML = `
+    <div style="text-align:center;">
+        <div style="font-size:12px; margin-bottom:10px;">${
+          m.match_type === "final" ? "🏆 GRAND FINAL" : "Match Details"
+        }</div>
+        <div style="display:flex; justify-content:center; align-items:center; gap:20px;">
+            <div style="text-align:center;">
+                <div style="width:40px; height:40px; background:${cA}; border-radius:50%; margin:0 auto 5px auto; box-shadow:0 0 10px ${cA};"></div>
+                <div style="font-weight:bold;">${m.team_a_name}</div>
+            </div>
+            <div style="font-size:30px; font-weight:800;">${
+              m.status === "finished" ? m.score_a + "-" + m.score_b : "VS"
+            }</div>
+            <div style="text-align:center;">
+                <div style="width:40px; height:40px; background:${cB}; border-radius:50%; margin:0 auto 5px auto; box-shadow:0 0 10px ${cB};"></div>
+                <div style="font-weight:bold;">${m.team_b_name}</div>
+            </div>
+        </div>
+    </div>
+    ${adminUI}
+  `;
+}
+
+function adjustScore(id, delta) {
+  const el = document.getElementById(id);
+  let val = parseInt(el.value) || 0;
+  val += delta;
+  if (val < 0) val = 0;
+  el.value = val;
 }
 
 async function saveScore(id) {
@@ -999,6 +1076,27 @@ async function saveScore(id) {
   });
   forceCloseModal("match");
   showToast("Score Updated");
+  loadMatches();
+}
+
+async function resetMatch(id) {
+  if (
+    !confirm(
+      "Are you sure? This will wipe the score and mark the match as not played."
+    )
+  )
+    return;
+
+  await fetch(`${API}/matches`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ matchId: id, action: "reset" }),
+  });
+  forceCloseModal("match");
+  showToast("Match Reset");
   loadMatches();
 }
 

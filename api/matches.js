@@ -1,121 +1,127 @@
 const { supabase } = require("./_supabase");
 
-function getUser(req) {
-  try {
-    return JSON.parse(
-      Buffer.from(req.headers.authorization.split(" ")[1], "base64").toString()
-    );
-  } catch {
-    return null;
-  }
-}
-
 module.exports = async function handler(req, res) {
-  const user = getUser(req);
-  const { tournamentId } = req.query;
+  const { tournamentId, matchId } = req.query;
 
+  // GET MATCHES
   if (req.method === "GET") {
-    if (!tournamentId) return res.json([]);
-    const { data, error } = await supabase
+    let query = supabase
       .from("matches")
-      .select("*")
+      .select(
+        `*, 
+        team_a:teams!team_a_id(name, jersey_color), 
+        team_b:teams!team_b_id(name, jersey_color)`
+      )
       .eq("tournament_id", tournamentId)
-      .order("match_order", { ascending: true })
-      .order("start_time", { ascending: true });
+      .order("match_order", { ascending: true });
+
+    const { data, error } = await query;
     if (error) return res.status(500).json({ error: error.message });
-    return res.json(data);
+
+    // Flatten structure for frontend convenience
+    const formatted = data.map((m) => ({
+      ...m,
+      team_a_name: m.team_a?.name || "Unknown",
+      team_b_name: m.team_b?.name || "Unknown",
+    }));
+
+    return res.json(formatted);
   }
 
-  if (!user || !user.isAdmin)
-    return res.status(403).json({ error: "Admin only" });
-
+  // POST: Create Match
   if (req.method === "POST") {
     const {
       teamAId,
       teamBId,
       startTime,
-      tournamentId: bodyTournId,
+      tournamentId: tId,
       matchType,
     } = req.body;
 
-    if (!teamAId || !teamBId)
-      return res.status(400).json({ error: "Select teams" });
-
-    const { data: teams } = await supabase
-      .from("teams")
-      .select("id, name")
-      .in("id", [teamAId, teamBId]);
-    const teamA = teams.find((t) => t.id === teamAId);
-    const teamB = teams.find((t) => t.id === teamBId);
-
-    const { data: max } = await supabase
+    // Get max order
+    const { data: maxData } = await supabase
       .from("matches")
       .select("match_order")
-      .eq("tournament_id", bodyTournId)
+      .eq("tournament_id", tId)
       .order("match_order", { ascending: false })
-      .limit(1)
-      .single();
-    const newOrder = (max?.match_order || 0) + 1;
+      .limit(1);
+
+    const nextOrder =
+      maxData && maxData.length > 0 ? maxData[0].match_order + 1 : 1;
 
     const { data, error } = await supabase
       .from("matches")
       .insert({
-        tournament_id: bodyTournId,
         team_a_id: teamAId,
         team_b_id: teamBId,
-        team_a_name: teamA.name,
-        team_b_name: teamB.name,
         start_time: startTime,
-        match_order: newOrder,
+        tournament_id: tId,
         match_type: matchType || "normal",
+        status: "scheduled",
+        match_order: nextOrder,
       })
-      .select()
-      .single();
+      .select();
 
     if (error) return res.status(500).json({ error: error.message });
-    return res.json(data);
+    return res.json(data[0]);
   }
 
-  // PUT: Update Score, Order, OR TEAMS (For Finals Update)
+  // PUT: Update Score, Reorder, or RESET
   if (req.method === "PUT") {
-    const { matchId, scoreA, scoreB, newOrder, teamAId, teamBId } = req.body;
+    const { matchId, scoreA, scoreB, newOrder, teamAId, teamBId, action } =
+      req.body;
 
-    let updateData = {};
+    // --- RESET MATCH LOGIC ---
+    if (action === "reset") {
+      const { error } = await supabase
+        .from("matches")
+        .update({
+          score_a: null,
+          score_b: null,
+          status: "scheduled",
+        })
+        .eq("id", matchId);
 
-    // Scenario 1: Update Teams (Auto-Finals update)
+      if (error) return res.status(500).json({ error: error.message });
+      return res.json({ message: "Match reset" });
+    }
+    // -------------------------
+
+    // Update Finals Teams
     if (teamAId && teamBId) {
-      const { data: teams } = await supabase
-        .from("teams")
-        .select("id, name")
-        .in("id", [teamAId, teamBId]);
-      const tA = teams.find((t) => t.id === teamAId);
-      const tB = teams.find((t) => t.id === teamBId);
-      updateData = {
-        team_a_id: teamAId,
-        team_b_id: teamBId,
-        team_a_name: tA.name,
-        team_b_name: tB.name,
-      };
-    }
-    // Scenario 2: Reorder
-    else if (newOrder !== undefined) {
-      updateData = { match_order: newOrder };
-    }
-    // Scenario 3: Score Update
-    else {
-      updateData = { score_a: scoreA, score_b: scoreB, status: "finished" };
+      const { error } = await supabase
+        .from("matches")
+        .update({ team_a_id: teamAId, team_b_id: teamBId })
+        .eq("id", matchId);
+      if (error) return res.status(500).json({ error: error.message });
+      return res.json({ message: "Teams updated" });
     }
 
-    const { data, error } = await supabase
+    // Reorder
+    if (newOrder !== undefined) {
+      const { error } = await supabase
+        .from("matches")
+        .update({ match_order: newOrder })
+        .eq("id", matchId);
+      if (error) return res.status(500).json({ error: error.message });
+      return res.json({ message: "Reordered" });
+    }
+
+    // Update Score
+    const { error } = await supabase
       .from("matches")
-      .update(updateData)
-      .eq("id", matchId)
-      .select()
-      .single();
+      .update({
+        score_a: scoreA,
+        score_b: scoreB,
+        status: "finished",
+      })
+      .eq("id", matchId);
+
     if (error) return res.status(500).json({ error: error.message });
-    return res.json(data);
+    return res.json({ message: "Score updated" });
   }
 
+  // DELETE
   if (req.method === "DELETE") {
     const { id } = req.body;
     const { error } = await supabase.from("matches").delete().eq("id", id);
