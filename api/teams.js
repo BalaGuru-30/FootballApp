@@ -63,12 +63,13 @@ module.exports = async function handler(req, res) {
       return res.json({ message: "Player added" });
     }
 
-    // NEW: Remove Player Logic
+    // NEW: Remove Player Logic (FIXED)
     if (action === "remove_player") {
       const { error } = await supabase
         .from("team_players")
         .delete()
-        .match({ team_id: teamId, player_id: playerId });
+        .eq("team_id", teamId)
+        .eq("player_id", playerId);
       if (error) return res.status(500).json({ error: error.message });
       return res.json({ message: "Player removed" });
     }
