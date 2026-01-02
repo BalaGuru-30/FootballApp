@@ -844,7 +844,7 @@ function renderFinalsSection() {
         ? `${finalMatch.score_a} - ${finalMatch.score_b}`
         : "VS";
 
-    // --- WINNER DISPLAY LOGIC ---
+    // --- NEW WINNER LAYOUT ---
     let winnerHTML = "";
     if (finalMatch.status === "finished") {
       let winnerName = "";
@@ -861,9 +861,11 @@ function renderFinalsSection() {
       if (winnerName) {
         winnerHTML = `
                 <div class="winner-section">
-                    <div class="winner-badge">🏆 Tournament Champion</div>
-                    <div style="width:60px; height:60px; background:${winnerColor}; border-radius:50%; margin: 0 auto 10px auto; box-shadow: 0 0 20px ${winnerColor}; border: 3px solid var(--surface);"></div>
-                    <div class="winner-name">${winnerName}</div>
+                    <div class="winner-avatar" style="background:${winnerColor}; box-shadow:0 0 15px ${winnerColor};"></div>
+                    <div class="winner-info">
+                        <div class="winner-label">🏆 Champion</div>
+                        <div class="winner-name">${winnerName}</div>
+                    </div>
                 </div>
              `;
       }
