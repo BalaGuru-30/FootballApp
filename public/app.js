@@ -9,7 +9,8 @@ let currentMatches = [];
 let activeTab = "standings";
 let currentFilterTeamId = "all";
 
-// Pagination State
+// Pagination & Tab State
+let activeTournTab = "today"; // 'today', 'upcoming', 'past'
 let upcomingPage = 1;
 let pastPage = 1;
 const PAGE_SIZE = 5;
@@ -22,7 +23,6 @@ function init() {
       const p = JSON.parse(atob(token));
       if (p.isAdmin) {
         isAdmin = true;
-        // CHANGE 1: Admin Title
         document.getElementById("app-title").textContent =
           "🏆 LeagueMgr (Admin)";
         document.getElementById("loginBtn").classList.add("hidden");
@@ -75,6 +75,24 @@ function showSection(id, tabEl) {
   if (id === "players") loadAllPlayers();
 }
 
+// NEW: Switch between Live, Upcoming, History
+function switchTournTab(tab) {
+  activeTournTab = tab;
+  // Update Buttons
+  document.querySelectorAll(".segment-btn").forEach((b) => {
+    b.classList.remove("active");
+    if (b.id === `seg-${tab}`) b.classList.add("active");
+  });
+  // Update Content
+  document.querySelectorAll(".tourn-tab-content").forEach((c) => {
+    c.classList.add("hidden");
+  });
+  document.getElementById(`tourn-tab-${tab}`).classList.remove("hidden");
+
+  // Refresh view to ensure pagination resets or displays correctly
+  renderTournaments(allTournaments);
+}
+
 function openModal(id) {
   document.getElementById(`modal-${id}`).classList.remove("hidden");
 }
@@ -88,7 +106,6 @@ function forceCloseModal(id) {
 
 // --- AUTH ---
 function toggleLogin() {
-  // CHANGE 3: Toggle both modal and backdrop
   document.getElementById("login-modal").classList.toggle("hidden");
   document.getElementById("login-backdrop").classList.toggle("hidden");
 }
@@ -106,7 +123,6 @@ async function login() {
     localStorage.setItem("token", data.token);
     location.reload();
   } else {
-    // CHANGE 2: Show specific error
     alert(data.error || "Login Failed");
   }
 }
@@ -121,6 +137,9 @@ async function loadTournaments() {
     headers: { Authorization: `Bearer ${token}` },
   });
   allTournaments = await res.json();
+
+  // Decide default tab logic: if no today, maybe show upcoming?
+  // For now, default to 'today' as initialized.
   renderTournaments(allTournaments);
 }
 
@@ -145,27 +164,25 @@ function renderTournaments(list) {
     }
   });
 
-  // Sort upcoming: Closest first (ASC). API gives DESC, so reverse
-  upcomingList.reverse();
-  // Past is already DESC (Recent first), which is correct.
+  upcomingList.reverse(); // ASC order
+  // Past is already DESC
 
   currentUpcomingList = upcomingList;
   currentPastList = pastList;
-  upcomingPage = 1;
-  pastPage = 1;
 
-  // 1. Render Today
+  // 1. Render Today (Always all items, no pagination)
   const todayContainer = document.getElementById("list-today");
-  const todayWrapper = document.getElementById("tourn-today-wrapper");
+  const todayHeader = document.getElementById("today-header");
   todayContainer.innerHTML = "";
   if (todayList.length > 0) {
-    todayWrapper.classList.remove("hidden");
+    todayHeader.classList.remove("hidden");
     todayList.forEach((t) => todayContainer.appendChild(createTournCard(t)));
   } else {
-    todayWrapper.classList.add("hidden");
+    todayHeader.classList.add("hidden");
+    todayContainer.innerHTML = `<div style="text-align:center; color:var(--text-dim); padding:20px;">No tournaments today</div>`;
   }
 
-  // 2. Render Upcoming & Past
+  // 2. Render Upcoming & Past (Paginated)
   renderPaginatedSection("upcoming");
   renderPaginatedSection("past");
 }
@@ -178,7 +195,7 @@ function renderPaginatedSection(type) {
   const controls = document.getElementById(`pag-${type}`);
 
   if (list.length === 0) {
-    container.innerHTML = `<div style="text-align:center; color:var(--text-dim); padding:10px; font-size:13px;">No tournaments</div>`;
+    container.innerHTML = `<div style="text-align:center; color:var(--text-dim); padding:20px;">No ${type} tournaments</div>`;
     controls.classList.add("hidden");
     return;
   }
@@ -190,14 +207,18 @@ function renderPaginatedSection(type) {
   slice.forEach((t) => container.appendChild(createTournCard(t)));
 
   // Pagination UI
-  controls.classList.remove("hidden");
-  document.getElementById(`page-num-${type}`).textContent = `Page ${page}`;
-  document.getElementById(`btn-prev-${type}`).disabled = page === 1;
-  document.getElementById(`btn-prev-${type}`).style.opacity =
-    page === 1 ? "0.3" : "1";
-  document.getElementById(`btn-next-${type}`).disabled = end >= list.length;
-  document.getElementById(`btn-next-${type}`).style.opacity =
-    end >= list.length ? "0.3" : "1";
+  if (list.length > PAGE_SIZE) {
+    controls.classList.remove("hidden");
+    document.getElementById(`page-num-${type}`).textContent = `Page ${page}`;
+    document.getElementById(`btn-prev-${type}`).disabled = page === 1;
+    document.getElementById(`btn-prev-${type}`).style.opacity =
+      page === 1 ? "0.3" : "1";
+    document.getElementById(`btn-next-${type}`).disabled = end >= list.length;
+    document.getElementById(`btn-next-${type}`).style.opacity =
+      end >= list.length ? "0.3" : "1";
+  } else {
+    controls.classList.add("hidden");
+  }
 }
 
 function changePage(type, delta) {

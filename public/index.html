@@ -142,6 +142,35 @@
         color: white;
       }
 
+      /* SEGMENTED CONTROL (NEW UI) */
+      .segment-control {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 20px;
+        overflow-x: auto;
+        padding-bottom: 5px;
+      }
+      .segment-btn {
+        flex: 1;
+        background: var(--surface);
+        border: 1px solid var(--surface-light);
+        color: var(--text-dim);
+        padding: 10px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        text-align: center;
+        white-space: nowrap;
+        transition: all 0.2s;
+      }
+      .segment-btn.active {
+        background: var(--primary);
+        color: white;
+        border-color: var(--primary);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+      }
+
       /* MATCH CARD STYLE */
       .match-card {
         display: flex;
@@ -305,21 +334,6 @@
       #toast.show {
         opacity: 1;
       }
-
-      details > summary {
-        list-style: none;
-        cursor: pointer;
-        color: var(--primary);
-        font-weight: 600;
-        padding: 10px 0;
-      }
-
-      /* New style for details to have margin */
-      details {
-        margin-bottom: 10px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-        padding-bottom: 5px;
-      }
     </style>
   </head>
   <body>
@@ -395,6 +409,31 @@
             />
             <span style="position: absolute; left: 12px; top: 12px">🔍</span>
           </div>
+
+          <div class="segment-control">
+            <div
+              id="seg-today"
+              class="segment-btn active"
+              onclick="switchTournTab('today')"
+            >
+              Live & Today
+            </div>
+            <div
+              id="seg-upcoming"
+              class="segment-btn"
+              onclick="switchTournTab('upcoming')"
+            >
+              Upcoming
+            </div>
+            <div
+              id="seg-past"
+              class="segment-btn"
+              onclick="switchTournTab('past')"
+            >
+              History
+            </div>
+          </div>
+
           <div class="flex-between gap-10" style="margin-bottom: 15px">
             <input type="date" id="filterDate" onchange="filterTournaments()" />
             <button
@@ -406,19 +445,18 @@
             </button>
           </div>
 
-          <div
-            id="tourn-today-wrapper"
-            class="hidden"
-            style="margin-bottom: 20px"
-          >
-            <h3 style="color: var(--gold); margin: 0 0 10px 0; font-size: 16px">
-              Today's Action
+          <div id="tourn-tab-today" class="tourn-tab-content">
+            <h3
+              id="today-header"
+              class="hidden"
+              style="color: var(--gold); margin: 0 0 10px 0; font-size: 16px"
+            >
+              Today's Tournament
             </h3>
             <div id="list-today"></div>
           </div>
 
-          <details id="details-upcoming">
-            <summary>Upcoming Tournaments</summary>
+          <div id="tourn-tab-upcoming" class="tourn-tab-content hidden">
             <div id="list-upcoming"></div>
             <div
               id="pag-upcoming"
@@ -445,10 +483,9 @@
                 Next
               </button>
             </div>
-          </details>
+          </div>
 
-          <details id="details-past">
-            <summary>Past Tournaments</summary>
+          <div id="tourn-tab-past" class="tourn-tab-content hidden">
             <div id="list-past"></div>
             <div
               id="pag-past"
@@ -475,7 +512,7 @@
                 Next
               </button>
             </div>
-          </details>
+          </div>
 
           <div
             id="fab-add-tourn"
