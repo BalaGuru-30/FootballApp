@@ -53,6 +53,12 @@ function init() {
   }, 3000);
 }
 
+// --- HELPER: Fix Date for API ---
+function getSafeDate(dateStr) {
+  if (!dateStr || dateStr === "No Date" || dateStr === "") return null;
+  return dateStr;
+}
+
 // --- UI HELPERS ---
 function showToast(msg) {
   const t = document.getElementById("toast");
@@ -649,7 +655,7 @@ async function scheduleMatch() {
     body: JSON.stringify({
       teamAId: tA,
       teamBId: tB,
-      startTime: activeTournamentDate,
+      startTime: getSafeDate(activeTournamentDate), // FIXED: Sanitized date
       tournamentId: activeTournamentId,
       matchType: type,
     }),
@@ -820,7 +826,7 @@ async function autoUpdateFinals() {
       body: JSON.stringify({
         teamAId: topA,
         teamBId: topB,
-        startTime: activeTournamentDate,
+        startTime: getSafeDate(activeTournamentDate), // FIXED: Sanitized date
         tournamentId: activeTournamentId,
         matchType: "final",
       }),
@@ -844,7 +850,7 @@ function renderFinalsSection() {
         ? `${finalMatch.score_a} - ${finalMatch.score_b}`
         : "VS";
 
-    // --- NEW WINNER LAYOUT ---
+    // --- REFINED WINNER LAYOUT ---
     let winnerHTML = "";
     if (finalMatch.status === "finished") {
       let winnerName = "";
