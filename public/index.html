@@ -85,6 +85,10 @@
         background: var(--gold);
         color: black;
       }
+      .btn-secondary {
+        background: var(--surface-light);
+        color: white;
+      }
 
       .btn-icon {
         background: transparent;
@@ -309,6 +313,13 @@
         font-weight: 600;
         padding: 10px 0;
       }
+
+      /* New style for details to have margin */
+      details {
+        margin-bottom: 10px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        padding-bottom: 5px;
+      }
     </style>
   </head>
   <body>
@@ -394,7 +405,78 @@
               Reset
             </button>
           </div>
-          <div id="tournament-list"></div>
+
+          <div
+            id="tourn-today-wrapper"
+            class="hidden"
+            style="margin-bottom: 20px"
+          >
+            <h3 style="color: var(--gold); margin: 0 0 10px 0; font-size: 16px">
+              Today's Action
+            </h3>
+            <div id="list-today"></div>
+          </div>
+
+          <details id="details-upcoming">
+            <summary>Upcoming Tournaments</summary>
+            <div id="list-upcoming"></div>
+            <div
+              id="pag-upcoming"
+              class="flex-between hidden"
+              style="margin-top: 10px; padding: 0 10px"
+            >
+              <button
+                class="btn-sm btn-secondary"
+                id="btn-prev-upcoming"
+                onclick="changePage('upcoming', -1)"
+              >
+                Prev
+              </button>
+              <span
+                id="page-num-upcoming"
+                style="font-size: 12px; color: var(--text-dim)"
+                >1</span
+              >
+              <button
+                class="btn-sm btn-secondary"
+                id="btn-next-upcoming"
+                onclick="changePage('upcoming', 1)"
+              >
+                Next
+              </button>
+            </div>
+          </details>
+
+          <details id="details-past">
+            <summary>Past Tournaments</summary>
+            <div id="list-past"></div>
+            <div
+              id="pag-past"
+              class="flex-between hidden"
+              style="margin-top: 10px; padding: 0 10px"
+            >
+              <button
+                class="btn-sm btn-secondary"
+                id="btn-prev-past"
+                onclick="changePage('past', -1)"
+              >
+                Prev
+              </button>
+              <span
+                id="page-num-past"
+                style="font-size: 12px; color: var(--text-dim)"
+                >1</span
+              >
+              <button
+                class="btn-sm btn-secondary"
+                id="btn-next-past"
+                onclick="changePage('past', 1)"
+              >
+                Next
+              </button>
+            </div>
+          </details>
+
           <div
             id="fab-add-tourn"
             class="hidden"

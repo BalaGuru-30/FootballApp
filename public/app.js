@@ -9,6 +9,13 @@ let currentMatches = [];
 let activeTab = "standings";
 let currentFilterTeamId = "all";
 
+// Pagination State
+let upcomingPage = 1;
+let pastPage = 1;
+const PAGE_SIZE = 5;
+let currentUpcomingList = [];
+let currentPastList = [];
+
 function init() {
   if (token) {
     try {
@@ -118,26 +125,107 @@ async function loadTournaments() {
 }
 
 function renderTournaments(list) {
-  const container = document.getElementById("tournament-list");
-  container.innerHTML = "";
+  const todayDate = new Date();
+  const year = todayDate.getFullYear();
+  const month = String(todayDate.getMonth() + 1).padStart(2, "0");
+  const day = String(todayDate.getDate()).padStart(2, "0");
+  const todayStr = `${year}-${month}-${day}`;
+
+  const todayList = [];
+  const upcomingList = [];
+  const pastList = [];
+
   list.forEach((t) => {
-    let adminBtn = isAdmin
-      ? `<div style="margin-top:10px; border-top:1px solid rgba(255,255,255,0.1); padding-top:10px; display:flex; justify-content:flex-end; gap:15px;">
+    if (t.tournament_date === todayStr) {
+      todayList.push(t);
+    } else if (t.tournament_date > todayStr) {
+      upcomingList.push(t);
+    } else {
+      pastList.push(t);
+    }
+  });
+
+  // Sort upcoming: Closest first (ASC). API gives DESC, so reverse
+  upcomingList.reverse();
+  // Past is already DESC (Recent first), which is correct.
+
+  currentUpcomingList = upcomingList;
+  currentPastList = pastList;
+  upcomingPage = 1;
+  pastPage = 1;
+
+  // 1. Render Today
+  const todayContainer = document.getElementById("list-today");
+  const todayWrapper = document.getElementById("tourn-today-wrapper");
+  todayContainer.innerHTML = "";
+  if (todayList.length > 0) {
+    todayWrapper.classList.remove("hidden");
+    todayList.forEach((t) => todayContainer.appendChild(createTournCard(t)));
+  } else {
+    todayWrapper.classList.add("hidden");
+  }
+
+  // 2. Render Upcoming & Past
+  renderPaginatedSection("upcoming");
+  renderPaginatedSection("past");
+}
+
+function renderPaginatedSection(type) {
+  const container = document.getElementById(`list-${type}`);
+  container.innerHTML = "";
+  const list = type === "upcoming" ? currentUpcomingList : currentPastList;
+  const page = type === "upcoming" ? upcomingPage : pastPage;
+  const controls = document.getElementById(`pag-${type}`);
+
+  if (list.length === 0) {
+    container.innerHTML = `<div style="text-align:center; color:var(--text-dim); padding:10px; font-size:13px;">No tournaments</div>`;
+    controls.classList.add("hidden");
+    return;
+  }
+
+  const start = (page - 1) * PAGE_SIZE;
+  const end = start + PAGE_SIZE;
+  const slice = list.slice(start, end);
+
+  slice.forEach((t) => container.appendChild(createTournCard(t)));
+
+  // Pagination UI
+  controls.classList.remove("hidden");
+  document.getElementById(`page-num-${type}`).textContent = `Page ${page}`;
+  document.getElementById(`btn-prev-${type}`).disabled = page === 1;
+  document.getElementById(`btn-prev-${type}`).style.opacity =
+    page === 1 ? "0.3" : "1";
+  document.getElementById(`btn-next-${type}`).disabled = end >= list.length;
+  document.getElementById(`btn-next-${type}`).style.opacity =
+    end >= list.length ? "0.3" : "1";
+}
+
+function changePage(type, delta) {
+  if (type === "upcoming") {
+    upcomingPage += delta;
+  } else {
+    pastPage += delta;
+  }
+  renderPaginatedSection(type);
+}
+
+function createTournCard(t) {
+  let adminBtn = isAdmin
+    ? `<div style="margin-top:10px; border-top:1px solid rgba(255,255,255,0.1); padding-top:10px; display:flex; justify-content:flex-end; gap:15px;">
            <span style="cursor:pointer; font-size:13px;" onclick="event.stopPropagation(); prepareEditTourn('${t.id}')">✏️ Edit</span>
            <span style="cursor:pointer; color:var(--danger); font-size:13px;" onclick="event.stopPropagation(); deleteTournament('${t.id}')">🗑 Delete</span>
         </div>`
-      : "";
+    : "";
 
-    const div = document.createElement("div");
-    div.className = "card";
-    div.onclick = () => openTournament(t.id, t.name, t.tournament_date);
-    div.innerHTML = `<div style="font-weight:bold; font-size:16px;">${
-      t.name
-    }</div><div style="font-size:12px; color:#94a3b8; margin-top:4px;">${
-      t.tournament_date || "No Date"
-    }</div>${adminBtn}`;
-    container.appendChild(div);
-  });
+  const div = document.createElement("div");
+  div.className = "card";
+  div.onclick = () => openTournament(t.id, t.name, t.tournament_date);
+  div.innerHTML = `<div style="font-weight:bold; font-size:16px;">${
+    t.name
+  }</div><div style="font-size:12px; color:#94a3b8; margin-top:4px;">${
+    t.tournament_date || "No Date"
+  }</div>${adminBtn}`;
+  return div;
 }
 
 function filterTournaments() {
