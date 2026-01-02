@@ -861,9 +861,9 @@ function renderFinalsSection() {
       if (winnerName) {
         winnerHTML = `
                 <div class="winner-section">
-                    <div class="winner-avatar" style="background:${winnerColor}; box-shadow:0 0 15px ${winnerColor};"></div>
-                    <div class="winner-info">
-                        <div class="winner-label">🏆 Champion</div>
+                    <div class="winner-label">🏆 Tournament Champion</div>
+                    <div class="winner-content">
+                        <div class="winner-avatar" style="background:${winnerColor}; box-shadow:0 0 10px ${winnerColor};"></div>
                         <div class="winner-name">${winnerName}</div>
                     </div>
                 </div>
