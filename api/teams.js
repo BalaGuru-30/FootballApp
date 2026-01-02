@@ -69,7 +69,7 @@ module.exports = async function handler(req, res) {
         .from("team_players")
         .delete()
         .eq("team_id", teamId)
-        .eq("player_id", playerId);
+        .eq("player_id", playerId); // Changed from .match() to explicit .eq()
       if (error) return res.status(500).json({ error: error.message });
       return res.json({ message: "Player removed" });
     }
