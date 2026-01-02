@@ -16,9 +16,10 @@ module.exports = async function handler(req, res) {
 
   // GET
   if (req.method === "GET") {
+    // FIX 1: Explicitly select 'player_id' so it's not undefined in the frontend
     let query = supabase
       .from("teams")
-      .select("*, team_players(players(*))")
+      .select("*, team_players(player_id, players(*))")
       .eq("tournament_id", tournamentId)
       .order("name");
     const { data, error } = await query;
@@ -63,13 +64,14 @@ module.exports = async function handler(req, res) {
       return res.json({ message: "Player added" });
     }
 
-    // NEW: Remove Player Logic (FIXED)
+    // FIX 2: Remove Player Logic with explicit .eq() checks
     if (action === "remove_player") {
       const { error } = await supabase
         .from("team_players")
         .delete()
         .eq("team_id", teamId)
-        .eq("player_id", playerId); // Changed from .match() to explicit .eq()
+        .eq("player_id", playerId);
+
       if (error) return res.status(500).json({ error: error.message });
       return res.json({ message: "Player removed" });
     }
