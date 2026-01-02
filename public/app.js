@@ -696,7 +696,7 @@ async function loadMatches(silent = false) {
 
 function renderMatchList(container) {
   container.innerHTML = "";
-  let matchCounter = 0; // FIX 1: Counter starts here
+  let matchCounter = 0;
 
   if (isAdmin && currentMatches.length > 0) {
     document.getElementById("btnGen").disabled = true;
@@ -707,12 +707,10 @@ function renderMatchList(container) {
   }
 
   currentMatches.forEach((m, index) => {
-    // FIX 2: Increment counter logic runs BEFORE filtering
     const isFinal = m.match_type === "final";
     if (!isFinal) matchCounter++;
     const matchLabel = isFinal ? "🏆 GRAND FINAL" : `Match ${matchCounter}`;
 
-    // FIX 3: Now apply filter
     if (currentFilterTeamId !== "all") {
       if (
         m.team_a_id !== currentFilterTeamId &&
@@ -846,7 +844,34 @@ function renderFinalsSection() {
         ? `${finalMatch.score_a} - ${finalMatch.score_b}`
         : "VS";
 
+    // --- WINNER DISPLAY LOGIC ---
+    let winnerHTML = "";
+    if (finalMatch.status === "finished") {
+      let winnerName = "";
+      let winnerColor = "";
+
+      if (finalMatch.score_a > finalMatch.score_b) {
+        winnerName = finalMatch.team_a_name;
+        winnerColor = cA;
+      } else if (finalMatch.score_b > finalMatch.score_a) {
+        winnerName = finalMatch.team_b_name;
+        winnerColor = cB;
+      }
+
+      if (winnerName) {
+        winnerHTML = `
+                <div class="winner-section">
+                    <div class="winner-badge">🏆 Tournament Champion</div>
+                    <div style="width:60px; height:60px; background:${winnerColor}; border-radius:50%; margin: 0 auto 10px auto; box-shadow: 0 0 20px ${winnerColor}; border: 3px solid var(--surface);"></div>
+                    <div class="winner-name">${winnerName}</div>
+                </div>
+             `;
+      }
+    }
+    // ---------------------------
+
     container.innerHTML = `
+       ${winnerHTML}
        <div class="match-card final-match" onclick="openMatchModal({id:'${
          finalMatch.id
        }', ...${JSON.stringify(finalMatch).replace(
@@ -996,7 +1021,6 @@ function openMatchModal(m, tA, tB) {
   const cA = tA ? tA.jersey_color : "#fff";
   const cB = tB ? tB.jersey_color : "#fff";
 
-  // FIX 4: Correct match number calculation for the modal header logic
   let matchLabelNum = 0;
   for (let x of currentMatches) {
     if (x.match_type !== "final") matchLabelNum++;
