@@ -597,7 +597,7 @@ async function removePlayerFromTeam(teamId, playerId, playerName) {
     },
     body: JSON.stringify({ action: "remove_player", teamId, playerId }),
   });
-  showToast("Player Removed"); // Added Toast here
+  showToast("Player Removed");
   loadTeams();
 }
 
@@ -994,20 +994,26 @@ function openMatchModal(m, tA, tB) {
   const cA = tA ? tA.jersey_color : "#fff";
   const cB = tB ? tB.jersey_color : "#fff";
 
-  // NEW UI for Admin
+  // Calculate Match Number based on current view list
+  const matchIndex = currentMatches.findIndex((match) => match.id === m.id) + 1;
+  const headerText =
+    m.match_type === "final"
+      ? "🏆 GRAND FINAL"
+      : `Match Details - Match ${matchIndex}`;
+
   const adminUI = isAdmin
     ? `
     <div style="margin-top:20px;">
         <div style="display:flex; justify-content:center; gap:20px;">
             <div class="score-wrapper">
                 <div class="score-input-container">
-                    <input id="scoreA" type="number" inputmode="numeric" value="${
-                      m.score_a !== null ? m.score_a : 0
-                    }">
                     <div class="score-arrows">
                         <button class="arrow-btn" onclick="adjustScore('scoreA', 1)">▲</button>
                         <button class="arrow-btn" onclick="adjustScore('scoreA', -1)">▼</button>
                     </div>
+                    <input id="scoreA" type="number" inputmode="numeric" value="${
+                      m.score_a !== null ? m.score_a : 0
+                    }">
                 </div>
             </div>
             
@@ -1027,16 +1033,13 @@ function openMatchModal(m, tA, tB) {
           m.id
         }')" style="margin-top:25px;">Update Score</button>
     </div>
-    
     <div class="reset-btn" onclick="resetMatch('${m.id}')">Reset Match</div>
     `
     : "";
 
   document.getElementById("match-modal-content").innerHTML = `
     <div style="text-align:center;">
-        <div style="font-size:12px; margin-bottom:10px;">${
-          m.match_type === "final" ? "🏆 GRAND FINAL" : "Match Details"
-        }</div>
+        <div style="font-size:12px; margin-bottom:10px;">${headerText}</div>
         <div style="display:flex; justify-content:center; align-items:center; gap:20px;">
             <div style="text-align:center;">
                 <div style="width:40px; height:40px; background:${cA}; border-radius:50%; margin:0 auto 5px auto; box-shadow:0 0 10px ${cA};"></div>
